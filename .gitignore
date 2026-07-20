@@ -486,3 +486,6 @@ Code snippet
 
 # Ignore environment-specific appsettings files
 appsettings.*.json
+
+# Ignore local Docker container data volumes
+.containers/

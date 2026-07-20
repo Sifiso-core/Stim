@@ -70,7 +70,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpPatch("gameId")]
+    [HttpPatch("{gameId}")]
 
     public async Task<ActionResult> PatchGame(string gameId, JsonPatchDocument<GameDto> document)
     {
@@ -85,10 +85,12 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         document.ApplyTo(gameDto, ModelState);
 
-        if (!ModelState.IsValid)
+        if (!TryValidateModel(gameDto))
         {
             return ValidationProblem(ModelState);
         }
+
+        game.Title = gameDto.Title;
 
         game.Description = gameDto.Description;
 

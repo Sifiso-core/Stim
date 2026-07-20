@@ -12,7 +12,7 @@ using Stim.Api.Data;
 namespace Stim.Api.Migrations.Application
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260720152351_InitMigration")]
+    [Migration("20260720153817_InitMigration")]
     partial class InitMigration
     {
         /// <inheritdoc />
