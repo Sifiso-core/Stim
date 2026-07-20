@@ -10,6 +10,7 @@ public class GameDto
     public string? Description { get; set; }
     public decimal Price { get; set; }
     public DateTime ReleaseDateUtc { get; set; }
+    public DateTime LastUpdatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
     public string DeveloperId { get; set; } = string.Empty;
     public ICollection<GenreDto> Genres { get; set; } = [];
