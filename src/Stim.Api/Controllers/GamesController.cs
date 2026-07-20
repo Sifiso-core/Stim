@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 
 namespace Stim.Api.Controllers;
@@ -11,11 +12,11 @@ namespace Stim.Api.Controllers;
 public class GamesController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<GameCollectionDto>> GetGames()
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames()
     {
         var games = await context.Games.Select(GameQueries.ProjectToGameDto()).ToListAsync();
 
-        var result = new GameCollectionDto()
+        var result = new DataCollectionResponse<GameDto>()
         {
             Data = games
         };

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Stim.Api.Models.Genre;
 
 namespace Stim.Api.Models.Game;
 
@@ -27,12 +28,6 @@ public static class GameQueries
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            GameTags = g.GameTags.Select(gt => new GameTag.GameTagDto()
-            {
-                GameId = gt.GameId,
-                CreatedAtUtc = gt.CreatedAtUtc,
-                TagId = gt.TagId
-            }).ToList()
         };
     }
 }

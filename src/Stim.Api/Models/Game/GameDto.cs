@@ -1,4 +1,5 @@
 using Stim.Api.Models.GameTag;
+using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
 
 namespace Stim.Api.Models.Game;
@@ -14,6 +15,5 @@ public class GameDto
     public string? ImageUrl { get; set; }
     public string DeveloperId { get; set; } = string.Empty;
     public ICollection<GenreDto> Genres { get; set; } = [];
-    public ICollection<GameTagDto> GameTags { get; set; } = [];
     public ICollection<TagDto> Tags { get; set; } = [];
 }

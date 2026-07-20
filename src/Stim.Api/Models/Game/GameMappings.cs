@@ -16,12 +16,6 @@ public static class GameMappings
             Price = game.Price,
             ReleaseDateUtc = game.ReleaseDateUtc,
             LastUpdatedAtUtc = game.LastUpdatedAtUtc,
-            GameTags = [.. game.GameTags.Select(gt => new GameTag.GameTagDto()
-            {
-                GameId = gt.GameId,
-                CreatedAtUtc = gt.CreatedAtUtc,
-                TagId = gt.TagId
-            })],
             Genres = [.. game.Genres.Select(g => new GenreDto(){
                 Id = g.Id,
                 Name = g.Name,
