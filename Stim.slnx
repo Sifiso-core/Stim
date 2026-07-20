@@ -2,4 +2,5 @@
   <Folder Name="/src/">
     <Project Path="src/Stim.Api/Stim.Api.csproj" />
   </Folder>
+
 </Solution>
