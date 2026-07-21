@@ -13,8 +13,8 @@ public class Game
     public DateTime LastUpdatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
     public string DeveloperId { get; set; } = string.Empty;
-    public ICollection<Genre> Genres { get; set; } = [];
-    public ICollection<GameTag> GameTags { get; set; } = [];
-    public ICollection<Tag> Tags { get; set; } = [];
+    public List<Genre> Genres { get; set; } = [];
+    public List<GameTag> GameTags { get; set; } = [];
+    public List<Tag> Tags { get; set; } = [];
 
 }

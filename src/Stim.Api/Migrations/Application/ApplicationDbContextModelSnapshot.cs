@@ -146,8 +146,14 @@ namespace Stim.Api.Migrations.Application
                     b.Property<string>("Id")
                         .HasColumnType("text");
 
-                    b.Property<string>("GameId")
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("LastUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -155,8 +161,6 @@ namespace Stim.Api.Migrations.Application
                         .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("GameId");
 
                     b.ToTable("Tags", "stim");
                 });
@@ -192,13 +196,6 @@ namespace Stim.Api.Migrations.Application
                         .HasForeignKey("GameId");
                 });
 
-            modelBuilder.Entity("Stim.Api.Entities.Tag", b =>
-                {
-                    b.HasOne("Stim.Api.Entities.Game", null)
-                        .WithMany("Tags")
-                        .HasForeignKey("GameId");
-                });
-
             modelBuilder.Entity("Stim.Api.Entities.Developer", b =>
                 {
                     b.Navigation("Games");
@@ -209,8 +206,6 @@ namespace Stim.Api.Migrations.Application
                     b.Navigation("GameTags");
 
                     b.Navigation("Genres");
-
-                    b.Navigation("Tags");
                 });
 #pragma warning restore 612, 618
         }

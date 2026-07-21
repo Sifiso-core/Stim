@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
+using Stim.Api.Models.GameTag;
+using Stim.Api.Models.Genre;
 
 namespace Stim.Api.Controllers;
 
@@ -14,7 +16,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames()
     {
-        var games = await context.Games.Select(GameQueries.ProjectToGameDto()).ToListAsync();
+        var games = await context.Games.Include(g => g.Tags).Select(GameQueries.ProjectToGameDto()).ToListAsync();
 
         var result = new DataCollectionResponse<GameDto>()
         {
@@ -26,7 +28,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
     [HttpGet("{gameId}", Name = "GetGame")]
     public async Task<ActionResult<GameDto>> GetGame(string gameId)
     {
-        var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await context.Games.Include(g => g.GameTags).Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game is null)
         {
@@ -109,6 +111,81 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         }
 
         context.Games.Remove(game);
+
+        await context.SaveChangesAsync();
+
+        return NoContent();
+    }
+    [HttpPut("{gameId}/tags")]
+    public async Task<ActionResult> UpsertGameTags(string gameId, [FromBody] UpsertGameTagDto upsertGameTagDto)
+    {
+        var game = await context.Games.Include(g => g.GameTags).FirstOrDefaultAsync(g => g.Id == gameId);
+
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        var currentTagIds = game.GameTags.Select(gt => gt.TagId).ToHashSet();
+
+        if (currentTagIds.SetEquals(upsertGameTagDto.TagIds))
+        {
+            return NoContent();
+        }
+
+        var existingTags = await context.Tags.Where(t => upsertGameTagDto.TagIds.Contains(t.Id)).Select(t => t.Id).ToListAsync();
+
+        if (existingTags.Count != upsertGameTagDto.TagIds.Count)
+        {
+            return BadRequest("One Or More Tags Ids Are Invalid");
+        }
+
+        game.GameTags.RemoveAll(t => !upsertGameTagDto.TagIds.Contains(t.TagId));
+
+        var tagIdsToAdd = upsertGameTagDto.TagIds.Except(currentTagIds).ToArray();
+
+        game.GameTags.AddRange(tagIdsToAdd.Select(t => new Entities.GameTag()
+        {
+            GameId = gameId,
+            TagId = t,
+            CreatedAtUtc = DateTime.UtcNow
+        }));
+
+        await context.SaveChangesAsync();
+
+        return NoContent();
+    }
+    [HttpPut("{gameId}/genres")]
+    public async Task<ActionResult> UpsertGameGenres(string gameId, [FromBody] UpsertGameGenresDto upsertGameGenresDto)
+    {
+        var game = await context.Games.Include(g => g.Genres).FirstOrDefaultAsync();
+
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        var requestedSlugs = upsertGameGenresDto.GenreSlugs.Select(s => s.ToLowerInvariant()).ToHashSet();
+
+        var currentSlugs = game.Genres.Select(g => g.Slug.ToLowerInvariant()).ToHashSet();
+
+        if (currentSlugs.SetEquals(requestedSlugs))
+        {
+            return NoContent();
+        }
+
+        var targetGenres = await context.Genres.Where(g => requestedSlugs.Contains(g.Slug.ToLower())).ToListAsync();
+
+        if (targetGenres.Count != requestedSlugs.Count)
+        {
+            return BadRequest("One or more genre slugs are invalid");
+        }
+
+        game.Genres.RemoveAll(g => !requestedSlugs.Contains(g.Slug.ToLowerInvariant()));
+
+        var genresToAdd = targetGenres.Where(g => !currentSlugs.Contains(g.Slug.ToLowerInvariant()));
+
+        game.Genres.AddRange(genresToAdd);
 
         await context.SaveChangesAsync();
 

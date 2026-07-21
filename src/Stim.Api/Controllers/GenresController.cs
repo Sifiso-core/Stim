@@ -63,7 +63,7 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         var result = genre.ToDto();
 
-        return CreatedAtRoute("GetGenreBySlugOrId", new { genreSlugOrId = genre.Slug }, result);
+        return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, result);
     }
     [HttpPut("{genreId}")]
     public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto)
@@ -75,6 +75,20 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
         }
 
         genre.UpdateGenre(updateGenreDto);
+
+        await context.SaveChangesAsync();
+
+        return NoContent();
+    }
+    [HttpDelete("{genreId}")]
+    public async Task<ActionResult> DeleteGenre(string genreId)
+    {
+        var genre = await context.Genres.FirstOrDefaultAsync(g => g.Id == genreId);
+        if (genre is null)
+        {
+            return NotFound();
+        }
+        context.Genres.Remove(genre);
 
         await context.SaveChangesAsync();
 

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Stim.Api.Migrations.Application
 {
     /// <inheritdoc />
-    public partial class InitMigration : Migration
+    public partial class InitChanges : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -27,6 +27,22 @@ namespace Stim.Api.Migrations.Application
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Developers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Tags",
+                schema: "stim",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Tags", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -53,47 +69,6 @@ namespace Stim.Api.Migrations.Application
                         principalTable: "Developers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Genres",
-                schema: "stim",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Slug = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    GameId = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Genres", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Genres_Games_GameId",
-                        column: x => x.GameId,
-                        principalSchema: "stim",
-                        principalTable: "Games",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Tags",
-                schema: "stim",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    GameId = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Tags", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Tags_Games_GameId",
-                        column: x => x.GameId,
-                        principalSchema: "stim",
-                        principalTable: "Games",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -124,6 +99,31 @@ namespace Stim.Api.Migrations.Application
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "Genres",
+                schema: "stim",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    ImageUrl = table.Column<string>(type: "text", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Slug = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    GameId = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Genres", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Genres_Games_GameId",
+                        column: x => x.GameId,
+                        principalSchema: "stim",
+                        principalTable: "Games",
+                        principalColumn: "Id");
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Games_DeveloperId",
                 schema: "stim",
@@ -148,12 +148,6 @@ namespace Stim.Api.Migrations.Application
                 table: "Genres",
                 column: "Slug",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Tags_GameId",
-                schema: "stim",
-                table: "Tags",
-                column: "GameId");
         }
 
         /// <inheritdoc />

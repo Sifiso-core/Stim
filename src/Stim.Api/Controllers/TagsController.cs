@@ -37,9 +37,16 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto)
     {
+
+        if (await context.Tags.AnyAsync(t => t.Name.Equals(createTagDto.Name)))
+        {
+            return BadRequest("The tag with the provided name already exists");
+        }
         var tag = createTagDto.ToEntity();
 
         await context.Tags.AddAsync(tag);
+
+        await context.SaveChangesAsync();
 
         var result = tag.ToDto();
 

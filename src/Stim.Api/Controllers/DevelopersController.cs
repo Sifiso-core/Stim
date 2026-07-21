@@ -43,6 +43,8 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         await context.Developers.AddAsync(developer);
 
+        await context.SaveChangesAsync();
+
         var result = developer.ToDto();
 
         return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, result);

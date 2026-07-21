@@ -18,5 +18,6 @@ public class GameTagEntityConfiguration : IEntityTypeConfiguration<GameTag>
         builder.HasOne<Tag>()
             .WithMany()
             .HasForeignKey(gt => gt.TagId);
+
     }
 }

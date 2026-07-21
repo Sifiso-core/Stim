@@ -14,6 +14,7 @@ public class GameDto
     public DateTime LastUpdatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
     public string DeveloperId { get; set; } = string.Empty;
-    public ICollection<GenreDto> Genres { get; set; } = [];
-    public ICollection<TagDto> Tags { get; set; } = [];
+    public List<GenreDto> Genres { get; set; } = [];
+    public List<TagDto> Tags { get; set; } = [];
+
 }

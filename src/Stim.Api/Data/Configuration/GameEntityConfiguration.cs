@@ -25,5 +25,7 @@ public class GameEntityConfiguration : IEntityTypeConfiguration<Game>
             .WithMany(d => d.Games)
             .HasForeignKey(g => g.DeveloperId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(g => g.Tags).WithMany().UsingEntity<GameTag>();
     }
 }

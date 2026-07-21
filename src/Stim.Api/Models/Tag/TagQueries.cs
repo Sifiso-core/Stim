@@ -9,7 +9,8 @@ public static class TagQueries
         return t => new TagDto
         {
             Id = t.Id,
-            Name = t.Name
+            Name = t.Name,
+            Description = t.Description
         };
     }
 }
