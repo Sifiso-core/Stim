@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Stim.Api.Data;
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers().AddNewtonsoftJson();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddProblemDetails();
 
