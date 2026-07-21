@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,8 +36,10 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
         return Ok(tag);
     }
     [HttpPost]
-    public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto)
+    public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto, [FromServices] IValidator<CreateTagDto> validator)
     {
+
+        await validator.ValidateAndThrowAsync(createTagDto);
 
         if (await context.Tags.AnyAsync(t => t.Name.Equals(createTagDto.Name)))
         {
@@ -53,8 +56,11 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
         return CreatedAtRoute("GetTag", new { tagId = tag.Id }, result);
     }
     [HttpPut("{tagId}")]
-    public async Task<ActionResult> UpdateTag(string tagId, [FromBody] UpdateTagDto updateTagDto)
+    public async Task<ActionResult> UpdateTag(string tagId, [FromBody] UpdateTagDto updateTagDto, [FromServices] IValidator<UpdateTagDto> validator)
     {
+
+        await validator.ValidateAndThrowAsync(updateTagDto);
+
         var tag = await context.Tags.FirstOrDefaultAsync(t => t.Id == tagId);
 
         if (tag is null)

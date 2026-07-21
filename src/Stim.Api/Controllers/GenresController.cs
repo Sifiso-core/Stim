@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -53,8 +54,11 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
         return Ok(result);
     }
     [HttpPost]
-    public async Task<ActionResult<GenreDto>> CreateGenre([FromBody] CreateGenreDto createGenreDto)
+    public async Task<ActionResult<GenreDto>> CreateGenre([FromBody] CreateGenreDto createGenreDto, [FromServices] IValidator<CreateGenreDto> validator)
     {
+
+        await validator.ValidateAndThrowAsync(createGenreDto);
+
         var genre = createGenreDto.ToEntity();
 
         await context.Genres.AddAsync(genre);
@@ -66,9 +70,13 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
         return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, result);
     }
     [HttpPut("{genreId}")]
-    public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto)
+    public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto, [FromServices] IValidator<UpdateGenreDto> validator)
     {
+
+        await validator.ValidateAndThrowAsync(updateGenreDto);
+
         var genre = await context.Genres.FirstOrDefaultAsync(g => g.Id == genreId);
+
         if (genre is null)
         {
             return NotFound();

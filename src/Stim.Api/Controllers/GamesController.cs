@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,8 +40,10 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         return Ok(result);
     }
     [HttpPost]
-    public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createGameDto)
+    public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createGameDto, [FromServices] IValidator<CreateGameDto> validator)
     {
+        await validator.ValidateAndThrowAsync(createGameDto);
+
         if (!await context.Developers.AnyAsync(d => d.Id == createGameDto.DeveloperId))
         {
             return BadRequest(error: $"Game Developer With Id '{createGameDto.DeveloperId}' does not exist");
@@ -55,9 +58,13 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         return CreatedAtRoute("GetGame", new { gameId = game.Id }, game.ToDto());
     }
     [HttpPut("{gameId}")]
-    public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto)
+    public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto, [FromServices] IValidator<UpdateGameDto> validator)
     {
+
+        await validator.ValidateAndThrowAsync(updateGameDto);
+
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+
         if (game is null)
         {
             return NotFound();

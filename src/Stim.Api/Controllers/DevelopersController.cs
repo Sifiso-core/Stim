@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -37,8 +38,10 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
         return Ok(developer);
     }
     [HttpPost]
-    public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto)
+    public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto, [FromServices] IValidator<CreateDeveloperDto> validator)
     {
+        await validator.ValidateAndThrowAsync(createDeveloperDto);
+
         var developer = createDeveloperDto.ToEntity();
 
         await context.Developers.AddAsync(developer);
@@ -50,8 +53,10 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
         return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, result);
     }
     [HttpPut("{developerId}")]
-    public async Task<ActionResult> UpdateDeveloper(string developerId, [FromBody] UpdateDeveloperDto updateDeveloperDto)
+    public async Task<ActionResult> UpdateDeveloper(string developerId, [FromBody] UpdateDeveloperDto updateDeveloperDto, [FromServices] IValidator<UpdateDeveloperDto> validator)
     {
+        await validator.ValidateAndThrowAsync(updateDeveloperDto);
+
         var developer = await context.Developers.FirstOrDefaultAsync(d => d.Id == developerId);
 
         if (developer is null)

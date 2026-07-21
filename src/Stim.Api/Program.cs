@@ -8,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddNewtonsoftJson();
 
+builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -25,7 +27,6 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
@@ -36,6 +37,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseExceptionHandler();
 
 app.UseAuthorization();
 
