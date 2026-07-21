@@ -10,7 +10,7 @@ namespace Stim.Api.Controllers;
 
 [Route("developers")]
 [ApiController]
-public class DeveloperController(ApplicationDbContext context) : ControllerBase
+public class DevelopersController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers()

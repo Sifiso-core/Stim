@@ -11,7 +11,7 @@ namespace Stim.Api.Controllers;
 
 [Route("genres")]
 [ApiController]
-public class GenreController(ApplicationDbContext context) : ControllerBase
+public class GenresController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<GenreDto>> GetGenres()
