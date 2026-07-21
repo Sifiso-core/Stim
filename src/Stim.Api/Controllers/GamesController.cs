@@ -91,13 +91,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        game.Title = gameDto.Title;
-
-        game.Description = gameDto.Description;
-
-        game.Price = gameDto.Price;
-
-        game.LastUpdatedAtUtc = DateTime.UtcNow;
+        game.UpdateGame(gameDto);
 
         await context.SaveChangesAsync();
 

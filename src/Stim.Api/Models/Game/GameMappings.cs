@@ -1,3 +1,4 @@
+using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
 
 namespace Stim.Api.Models.Game;
@@ -48,6 +49,16 @@ public static class GameMappings
         game.ImageUrl = updateGameDto.ImageUrl;
         game.Price = updateGameDto.Price;
         game.ReleaseDateUtc = updateGameDto.ReleaseDateUtc;
+        game.LastUpdatedAtUtc = DateTime.UtcNow;
+    }
+    public static void UpdateGame(this Entities.Game game, GameDto gameDto)
+    {
+        game.Title = gameDto.Title;
+        game.Description = gameDto.Description;
+        game.DeveloperId = gameDto.DeveloperId;
+        game.ImageUrl = gameDto.ImageUrl;
+        game.Price = gameDto.Price;
+        game.ReleaseDateUtc = gameDto.ReleaseDateUtc;
         game.LastUpdatedAtUtc = DateTime.UtcNow;
     }
 }
