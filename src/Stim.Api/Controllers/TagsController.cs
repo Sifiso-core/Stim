@@ -13,9 +13,11 @@ namespace Stim.Api.Controllers;
 public class TagsController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags()
+    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries)
     {
-        var tags = await context.Tags.Select(TagQueries.ProjectToDto()).ToListAsync();
+        var search = queries.Search?.Trim().ToLower();
+
+        var tags = await context.Tags.Where(t => search == null || t.Name.ToLower().Contains(search)).Select(TagQueries.ProjectToDto()).ToListAsync();
 
         var result = new DataCollectionResponse<TagDto>
         {

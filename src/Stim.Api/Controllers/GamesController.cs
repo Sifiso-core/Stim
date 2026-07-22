@@ -15,9 +15,14 @@ namespace Stim.Api.Controllers;
 public class GamesController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames()
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries)
     {
-        var games = await context.Games.Include(g => g.Tags).Select(GameQueries.ProjectToGameDto()).ToListAsync();
+        var search = queries.Search?.Trim().ToLower();
+
+        var games = await context.Games.Include(g => g.Tags)
+        .Where(g => search == null || g.Title.ToLower().Contains(search) || g.Description != null && g.Description.ToLower().Contains(search))
+        .Select(GameQueries.ProjectToGameDto())
+        .ToListAsync();
 
         var result = new DataCollectionResponse<GameDto>()
         {

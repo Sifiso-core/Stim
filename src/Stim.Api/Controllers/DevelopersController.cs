@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Developer;
 
@@ -14,9 +15,15 @@ namespace Stim.Api.Controllers;
 public class DevelopersController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers()
+    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers([FromQuery] DeveloperQueryParameters queries)
     {
-        var developers = await context.Developers.AsNoTracking().Select(DeveloperQueries.ProjectToDto()).ToListAsync();
+
+
+        var search = queries.Search?.Trim().ToLower();
+
+        var developers = await context.Developers.Where(d => search == null || d.Name.ToLower().Contains(search))
+                                                                    .Select(DeveloperQueries.ProjectToDto())
+                                                                    .ToListAsync();
 
         var result = new DataCollectionResponse<DeveloperDto>
         {

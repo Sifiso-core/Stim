@@ -1,6 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
@@ -15,9 +13,16 @@ namespace Stim.Api.Controllers;
 public class GenresController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<GenreDto>> GetGenres()
+    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries)
     {
-        var genres = await context.Genres.AsNoTracking().Select(GenreQueries.ProjectToDto()).ToListAsync();
+        var search = queries.Search?.Trim().ToLower();
+
+        var slug = queries.Slug?.Trim().ToLower();
+
+        var genres = await context.Genres
+            .Where(g => search == null || g.Name.ToLower().Contains(search))
+            .Where(g => slug == null || g.Slug.ToLower().Equals(slug))
+            .Select(GenreQueries.ProjectToDto()).ToListAsync();
 
         var result = new DataCollectionResponse<GenreDto>()
         {
