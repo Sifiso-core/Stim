@@ -7,4 +7,5 @@ public class GenreQueryParameters
     [FromQuery(Name = "q")]
     public string? Search { get; set; }
     public string? Slug { get; set; }
+    public string? Sort { get; set; }
 }

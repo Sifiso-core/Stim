@@ -6,5 +6,6 @@ public class GameQueryParameters
 {
     [FromQuery(Name = "q")]
     public string? Search { get; set; }
+    public string? Sort { get; set; }
 
 }

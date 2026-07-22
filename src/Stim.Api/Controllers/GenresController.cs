@@ -2,9 +2,11 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
@@ -13,8 +15,14 @@ namespace Stim.Api.Controllers;
 public class GenresController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries)
+    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider)
     {
+        if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        var sortMappings = sortMappingProvider.GetMappings<GenreDto, Genre>();
+
         var search = queries.Search?.Trim().ToLower();
 
         var slug = queries.Slug?.Trim().ToLower();
@@ -22,6 +30,7 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
         var genres = await context.Genres
             .Where(g => search == null || g.Name.ToLower().Contains(search))
             .Where(g => slug == null || g.Slug.ToLower().Equals(slug))
+            .ApplySort(queries.Sort, sortMappings)
             .Select(GenreQueries.ProjectToDto()).ToListAsync();
 
         var result = new DataCollectionResponse<GenreDto>()

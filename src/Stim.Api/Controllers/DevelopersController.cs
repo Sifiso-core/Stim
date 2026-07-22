@@ -7,6 +7,7 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Developer;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
@@ -15,13 +16,19 @@ namespace Stim.Api.Controllers;
 public class DevelopersController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers([FromQuery] DeveloperQueryParameters queries)
+    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers([FromQuery] DeveloperQueryParameters queries, SortMappingProvider sortMappingProvider)
     {
+        if (!sortMappingProvider.ValidateMappings<DeveloperDto, Developer>(queries.Sort))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
 
+        var sortMappings = sortMappingProvider.GetMappings<DeveloperDto, Developer>();
 
         var search = queries.Search?.Trim().ToLower();
 
         var developers = await context.Developers.Where(d => search == null || d.Name.ToLower().Contains(search))
+                                                                    .ApplySort(queries.Sort, sortMappings)
                                                                     .Select(DeveloperQueries.ProjectToDto())
                                                                     .ToListAsync();
 

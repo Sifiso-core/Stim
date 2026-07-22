@@ -1,10 +1,20 @@
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Models.Game;
 
 public static class GameMappings
 {
+    public static readonly SortMappingDefinition<GameDto, Entities.Game> SortMapping = new()
+    {
+        Mappings = [
+            new(nameof(GameDto.Title),nameof(Entities.Game.Title)),
+            new(nameof(GameDto.Price),nameof(Entities.Game.Price)),
+            new(nameof(GameDto.ReleaseDateUtc),nameof(Entities.Game.ReleaseDateUtc)),
+            new(nameof(GameDto.LastUpdatedAtUtc),nameof(Entities.Game.LastUpdatedAtUtc)),
+        ]
+    };
     public static GameDto ToDto(this Entities.Game game)
     {
         return new GameDto()

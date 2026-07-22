@@ -1,7 +1,15 @@
+using Stim.Api.Services.Sorting;
+
 namespace Stim.Api.Models.Tag;
 
 public static class TagMappings
 {
+    public static readonly SortMappingDefinition<TagDto, Entities.Tag> SortMapping = new()
+    {
+        Mappings = [
+        new(nameof(TagDto.Name),nameof(Entities.Tag.Name))
+        ]
+    };
     public static Entities.Tag ToEntity(this CreateTagDto dto)
     {
         return new Entities.Tag()

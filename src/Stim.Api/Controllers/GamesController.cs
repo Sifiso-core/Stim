@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
@@ -15,12 +17,19 @@ namespace Stim.Api.Controllers;
 public class GamesController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries)
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider)
     {
+        if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        var sortMappings = sortMappingProvider.GetMappings<GameDto, Game>();
+
         var search = queries.Search?.Trim().ToLower();
 
         var games = await context.Games.Include(g => g.Tags)
         .Where(g => search == null || g.Title.ToLower().Contains(search) || g.Description != null && g.Description.ToLower().Contains(search))
+        .ApplySort(queries.Sort, sortMappings)
         .Select(GameQueries.ProjectToGameDto())
         .ToListAsync();
 

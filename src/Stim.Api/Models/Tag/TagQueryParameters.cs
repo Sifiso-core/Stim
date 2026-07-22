@@ -6,4 +6,5 @@ public class TagQueryParameters
 {
     [FromQuery(Name = "q")]
     public string? Search { get; set; }
+    public string? Sort { get; set; }
 }

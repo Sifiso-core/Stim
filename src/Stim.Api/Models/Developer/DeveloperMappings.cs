@@ -1,11 +1,20 @@
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Models.Developer;
 
 public static class DeveloperMappings
 {
+    public static readonly SortMappingDefinition<DeveloperDto, Entities.Developer> SortMapping = new()
+    {
+        Mappings = [
+            new(nameof(DeveloperDto.Name),nameof(Entities.Developer.Name)),
+            new(nameof(DeveloperDto.WebsiteUrl),nameof(Entities.Developer.WebsiteUrl)),
+            new(nameof(DeveloperDto.Description),nameof(Entities.Developer.Description)),
+        ]
+    };
     public static Entities.Developer ToEntity(this CreateDeveloperDto dto)
     {
         return new Entities.Developer()

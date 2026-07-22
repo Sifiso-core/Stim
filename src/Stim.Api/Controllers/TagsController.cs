@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
@@ -13,11 +15,20 @@ namespace Stim.Api.Controllers;
 public class TagsController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries)
+    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries, SortMappingProvider sortMappingProvider)
     {
+        if (!sortMappingProvider.ValidateMappings<TagDto, Tag>(queries.Sort))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+
+        var sortMappings = sortMappingProvider.GetMappings<TagDto, Tag>();
+
         var search = queries.Search?.Trim().ToLower();
 
-        var tags = await context.Tags.Where(t => search == null || t.Name.ToLower().Contains(search)).Select(TagQueries.ProjectToDto()).ToListAsync();
+        var tags = await context.Tags.Where(t => search == null || t.Name.ToLower().Contains(search))
+        .ApplySort(queries.Sort, sortMappings)
+        .Select(TagQueries.ProjectToDto()).ToListAsync();
 
         var result = new DataCollectionResponse<TagDto>
         {

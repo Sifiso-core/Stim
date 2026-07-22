@@ -1,9 +1,17 @@
 using Stim.Api.Extensions;
+using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Models.Genre;
 
 public static class GenreMappings
 {
+    public static readonly SortMappingDefinition<GenreDto, Entities.Genre> SortMapping = new()
+    {
+        Mappings = [
+        new(nameof(GenreDto.Name),nameof(Entities.Genre.Name)),
+            new(nameof(GenreDto.Slug),nameof(Entities.Genre.Slug))
+        ]
+    };
     public static GenreDto ToDto(this Entities.Genre genre)
     {
         return new GenreDto()
