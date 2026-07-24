@@ -26,14 +26,12 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
 
         var search = queries.Search?.Trim().ToLower();
 
-        var tags = await context.Tags.Where(t => search == null || t.Name.ToLower().Contains(search))
+        var tagsQuaryable = context.Tags.Where(t => search == null || t.Name.ToLower().Contains(search))
         .ApplySort(queries.Sort, sortMappings)
-        .Select(TagQueries.ProjectToDto()).ToListAsync();
+        .Select(TagQueries.ProjectToDto());
 
-        var result = new DataCollectionResponse<TagDto>
-        {
-            Data = tags
-        };
+        var result = DataCollectionResponse<TagDto>.CreateAsync(tagsQuaryable, queries.Page, queries.PageSize);
+
         return Ok(result);
     }
     [HttpGet("{tagId}", Name = "GetTag")]

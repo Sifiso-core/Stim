@@ -27,16 +27,12 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         var search = queries.Search?.Trim().ToLower();
 
-        var games = await context.Games.Include(g => g.Tags)
+        var gamesQueryable = context.Games.Include(g => g.Tags)
         .Where(g => search == null || g.Title.ToLower().Contains(search) || g.Description != null && g.Description.ToLower().Contains(search))
         .ApplySort(queries.Sort, sortMappings)
-        .Select(GameQueries.ProjectToGameDto())
-        .ToListAsync();
+        .Select(GameQueries.ProjectToGameDto());
 
-        var result = new DataCollectionResponse<GameDto>()
-        {
-            Data = games
-        };
+        var result = DataCollectionResponse<GameDto>.CreateAsync(gamesQueryable, queries.Page, queries.PageSize);
 
         return Ok(result);
     }

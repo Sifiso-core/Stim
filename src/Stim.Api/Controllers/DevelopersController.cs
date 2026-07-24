@@ -27,15 +27,12 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         var search = queries.Search?.Trim().ToLower();
 
-        var developers = await context.Developers.Where(d => search == null || d.Name.ToLower().Contains(search))
+        var developersQueryable = context.Developers.Where(d => search == null || d.Name.ToLower().Contains(search))
                                                                     .ApplySort(queries.Sort, sortMappings)
-                                                                    .Select(DeveloperQueries.ProjectToDto())
-                                                                    .ToListAsync();
+                                                                    .Select(DeveloperQueries.ProjectToDto());
 
-        var result = new DataCollectionResponse<DeveloperDto>
-        {
-            Data = developers
-        };
+
+        var result = await DataCollectionResponse<DeveloperDto>.CreateAsync(developersQueryable, queries.Page, queries.PageSize);
 
         return Ok(result);
     }

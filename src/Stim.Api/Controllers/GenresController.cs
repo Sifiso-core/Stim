@@ -27,16 +27,14 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         var slug = queries.Slug?.Trim().ToLower();
 
-        var genres = await context.Genres
+        var genresQueryable = context.Genres
             .Where(g => search == null || g.Name.ToLower().Contains(search))
             .Where(g => slug == null || g.Slug.ToLower().Equals(slug))
             .ApplySort(queries.Sort, sortMappings)
-            .Select(GenreQueries.ProjectToDto()).ToListAsync();
+            .Select(GenreQueries.ProjectToDto());
 
-        var result = new DataCollectionResponse<GenreDto>()
-        {
-            Data = genres
-        };
+        var result = DataCollectionResponse<GenreDto>.CreateAsync(genresQueryable, queries.Page, queries.PageSize);
+
 
         return Ok(result);
     }
