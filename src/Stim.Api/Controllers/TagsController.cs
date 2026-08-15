@@ -1,3 +1,4 @@
+using System.Dynamic;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -6,6 +7,7 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
@@ -15,13 +17,16 @@ namespace Stim.Api.Controllers;
 public class TagsController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries, SortMappingProvider sortMappingProvider)
+    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<TagDto, Tag>(queries.Sort))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
         }
-
+        if (!dataShapingService.Validate<TagDto>(queries.Fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
+        }
         var sortMappings = sortMappingProvider.GetMappings<TagDto, Tag>();
 
         var search = queries.Search?.Trim().ToLower();
@@ -30,13 +35,22 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
         .ApplySort(queries.Sort, sortMappings)
         .Select(TagQueries.ProjectToDto());
 
-        var result = DataCollectionResponse<TagDto>.CreateAsync(tagsQuaryable, queries.Page, queries.PageSize);
+        var paginationResult = await tagsQuaryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
+
+        var result = new DataCollectionResponse<ExpandoObject>()
+        {
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+        };
 
         return Ok(result);
     }
     [HttpGet("{tagId}", Name = "GetTag")]
-    public async Task<ActionResult<TagDto>> GetTag(string tagId)
+    public async Task<ActionResult<TagDto>> GetTag(string tagId, [FromServices] DataShapingService dataShapingService, string? fields)
     {
+        if (!dataShapingService.Validate<TagDto>(fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {fields}");
+        }
         var tag = await context.Tags.FirstOrDefaultAsync(t => t.Id == tagId);
 
         if (tag is null)

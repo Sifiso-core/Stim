@@ -1,4 +1,6 @@
 using System.Linq.Dynamic.Core;
+using Microsoft.EntityFrameworkCore;
+using Stim.Api.Models.Common;
 
 namespace Stim.Api.Services.Sorting;
 
@@ -47,5 +49,24 @@ public static class QueryableExtensions
         var isDescending = parts.Length > 1 && parts[1].Equals("desc", StringComparison.OrdinalIgnoreCase);
 
         return (sortField, isDescending);
+    }
+
+    public static async Task<PaginationResult<T>> ToPaginationResultAsync<T>(
+            this IQueryable<T> query,
+            int page,
+            int pageSize)
+    {
+        var totalCount = await query.CountAsync();
+        var data = await query.Skip((page - 1) * pageSize)
+                              .Take(pageSize)
+                              .ToListAsync();
+
+        return new PaginationResult<T>
+        {
+            Data = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 }

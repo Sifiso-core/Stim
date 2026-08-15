@@ -1,3 +1,4 @@
+using System.Dynamic;
 using FluentValidation;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
@@ -17,11 +19,15 @@ namespace Stim.Api.Controllers;
 public class GamesController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider)
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        if (!dataShapingService.Validate<GameDto>(queries.Fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
         }
         var sortMappings = sortMappingProvider.GetMappings<GameDto, Game>();
 
@@ -32,13 +38,22 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         .ApplySort(queries.Sort, sortMappings)
         .Select(GameQueries.ProjectToGameDto());
 
-        var result = DataCollectionResponse<GameDto>.CreateAsync(gamesQueryable, queries.Page, queries.PageSize);
+        var paginationResult = await gamesQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
+
+        var result = new DataCollectionResponse<ExpandoObject>()
+        {
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+        };
 
         return Ok(result);
     }
     [HttpGet("{gameId}", Name = "GetGame")]
-    public async Task<ActionResult<GameDto>> GetGame(string gameId)
+    public async Task<ActionResult<GameDto>> GetGame(string gameId, [FromServices] DataShapingService dataShapingService, string? fields)
     {
+        if (!dataShapingService.Validate<GameDto>(fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {fields}");
+        }
         var game = await context.Games.Include(g => g.GameTags).Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game is null)
@@ -58,6 +73,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         {
             return BadRequest(error: $"Game Developer With Id '{createGameDto.DeveloperId}' does not exist");
         }
+
 
         var game = createGameDto.ToEntity();
 

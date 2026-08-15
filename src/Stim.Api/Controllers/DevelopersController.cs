@@ -1,3 +1,4 @@
+using System.Dynamic;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
@@ -7,6 +8,7 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Developer;
+using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
@@ -16,11 +18,15 @@ namespace Stim.Api.Controllers;
 public class DevelopersController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers([FromQuery] DeveloperQueryParameters queries, SortMappingProvider sortMappingProvider)
+    public async Task<IActionResult> GetDevelopers([FromQuery] DeveloperQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<DeveloperDto, Developer>(queries.Sort))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        if (!dataShapingService.Validate<DeveloperDto>(queries.Fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
         }
 
         var sortMappings = sortMappingProvider.GetMappings<DeveloperDto, Developer>();
@@ -31,22 +37,33 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
                                                                     .ApplySort(queries.Sort, sortMappings)
                                                                     .Select(DeveloperQueries.ProjectToDto());
 
+        var paginationResult = await developersQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
-        var result = await DataCollectionResponse<DeveloperDto>.CreateAsync(developersQueryable, queries.Page, queries.PageSize);
+        var result = new DataCollectionResponse<ExpandoObject>()
+        {
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+        };
+
 
         return Ok(result);
     }
     [HttpGet("{developerId}", Name = "GetDeveloper")]
-    public async Task<ActionResult<DeveloperDto>> GetDeveloper(string developerId)
+    public async Task<IActionResult> GetDeveloper(string developerId, [FromServices] DataShapingService dataShapingService, string? fields)
     {
+        if (!dataShapingService.Validate<DeveloperDto>(fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {fields}");
+        }
+
         var developer = await context.Developers.Include(d => d.Games).Select(DeveloperQueries.ProjectToDto()).FirstOrDefaultAsync(d => d.Id == developerId);
 
         if (developer is null)
         {
             return NotFound();
         }
+        var result = dataShapingService.ShapeData(developer, fields);
 
-        return Ok(developer);
+        return Ok(result);
     }
     [HttpPost]
     public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto, [FromServices] IValidator<CreateDeveloperDto> validator)

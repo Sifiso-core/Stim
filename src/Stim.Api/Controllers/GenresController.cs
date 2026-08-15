@@ -1,3 +1,4 @@
+using System.Dynamic;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
@@ -15,11 +17,15 @@ namespace Stim.Api.Controllers;
 public class GenresController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider)
+    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        if (!dataShapingService.Validate<GenreDto>(queries.Fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
         }
         var sortMappings = sortMappingProvider.GetMappings<GenreDto, Genre>();
 
@@ -33,14 +39,23 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
             .ApplySort(queries.Sort, sortMappings)
             .Select(GenreQueries.ProjectToDto());
 
-        var result = DataCollectionResponse<GenreDto>.CreateAsync(genresQueryable, queries.Page, queries.PageSize);
+        var paginationResult = await genresQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
+
+        var result = new DataCollectionResponse<ExpandoObject>()
+        {
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+        };
 
 
         return Ok(result);
     }
     [HttpGet("{identifier}", Name = "GetGenreBySlugOrId")]
-    public async Task<ActionResult<GenreDto>> GetGenreBySlugOrId(string identifier)
+    public async Task<ActionResult<GenreDto>> GetGenreBySlugOrId(string identifier, [FromServices] DataShapingService dataShapingService, string? fields)
     {
+        if (!dataShapingService.Validate<GenreDto>(fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {fields}");
+        }
         var isId = identifier.StartsWith("g_", StringComparison.OrdinalIgnoreCase);
 
         var genre = await context.Genres.FirstOrDefaultAsync(g => isId ? g.Id == identifier : g.Slug == identifier.ToLower());

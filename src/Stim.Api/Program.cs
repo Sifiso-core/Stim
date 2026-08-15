@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Newtonsoft.Json.Serialization;
 using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Middleware;
@@ -8,11 +9,15 @@ using Stim.Api.Models.Developer;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Sorting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers().AddNewtonsoftJson();
+builder.Services.AddControllers().AddNewtonsoftJson(options =>
+{
+    options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+});
 
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 
@@ -29,6 +34,8 @@ builder.Services.AddSingleton<ISortMappingDefinition, SortMappingDefinition<Game
 builder.Services.AddSingleton<ISortMappingDefinition, SortMappingDefinition<GenreDto, Genre>>(_ => GenreMappings.SortMapping);
 
 builder.Services.AddSingleton<ISortMappingDefinition, SortMappingDefinition<TagDto, Tag>>(_ => TagMappings.SortMapping);
+
+builder.Services.AddTransient<DataShapingService>();
 
 builder.Services.AddProblemDetails();
 
