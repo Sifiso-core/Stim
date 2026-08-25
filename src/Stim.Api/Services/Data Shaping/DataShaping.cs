@@ -2,13 +2,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Dynamic;
 using System.Reflection;
+using Stim.Api.Models.Common;
 
 namespace Stim.Api.Services.Data_Shaping;
 
 public class DataShapingService
 {
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertiesCache = new();
-    public List<ExpandoObject> ShapeCollectionData<T>(IEnumerable<T> entities, string? fields)
+    public List<ExpandoObject> ShapeCollectionData<T>(IEnumerable<T> entities, string? fields, Func<T, List<LinkDto>>? linkDtosFactory = null)
     {
         var fieldHashSet = fields?.Split(',', StringSplitOptions.RemoveEmptyEntries)
                                                 .Select(f => f.Trim())
@@ -29,6 +30,10 @@ public class DataShapingService
             foreach (var propertyInfo in propertyInfos)
             {
                 shapedObject[propertyInfo.Name] = propertyInfo.GetValue(entity);
+            }
+            if (linkDtosFactory is not null)
+            {
+                shapedObject["links"] = linkDtosFactory(entity);
             }
             shapedObjects.Add((ExpandoObject)shapedObject);
         }

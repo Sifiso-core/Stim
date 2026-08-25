@@ -10,15 +10,16 @@ using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
 using Stim.Api.Services.Data_Shaping;
+using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
 [Route("games")]
 [ApiController]
-public class GamesController(ApplicationDbContext context) : ControllerBase
+public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Name = "GetGames")]
     public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
@@ -40,9 +41,14 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         var paginationResult = await gamesQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
+        var links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+
+        paginationResult.Links = links;
+
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, d => hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields)),
+            Links = links
         };
 
         return Ok(result);
@@ -60,11 +66,15 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         {
             return NotFound();
         }
-        var result = game.ToDto();
+        var gameDto = game.ToDto();
 
-        return Ok(result);
+        var links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
+
+        gameDto.Links = links;
+
+        return Ok(gameDto);
     }
-    [HttpPost]
+    [HttpPost(Name = "CreateGame")]
     public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createGameDto, [FromServices] IValidator<CreateGameDto> validator)
     {
         await validator.ValidateAndThrowAsync(createGameDto);
@@ -74,16 +84,17 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
             return BadRequest(error: $"Game Developer With Id '{createGameDto.DeveloperId}' does not exist");
         }
 
-
         var game = createGameDto.ToEntity();
 
         await context.Games.AddAsync(game);
 
         await context.SaveChangesAsync();
 
+        var links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
+
         return CreatedAtRoute("GetGame", new { gameId = game.Id }, game.ToDto());
     }
-    [HttpPut("{gameId}")]
+    [HttpPut("{gameId}", Name = "UpdateGame")]
     public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto, [FromServices] IValidator<UpdateGameDto> validator)
     {
 
@@ -106,7 +117,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpPatch("{gameId}")]
+    [HttpPatch("{gameId}", Name = "PatchGame")]
 
     public async Task<ActionResult> PatchGame(string gameId, JsonPatchDocument<GameDto> document)
     {
@@ -133,7 +144,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{gameId}")]
+    [HttpDelete("{gameId}", Name = "DeleteGame")]
     public async Task<ActionResult> DeleteGame(string gameId)
     {
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
@@ -149,7 +160,7 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpPut("{gameId}/tags")]
+    [HttpPut("{gameId}/tags", Name = "UpsertGameTags")]
     public async Task<ActionResult> UpsertGameTags(string gameId, [FromBody] UpsertGameTagDto upsertGameTagDto)
     {
         var game = await context.Games.Include(g => g.GameTags).FirstOrDefaultAsync(g => g.Id == gameId);
@@ -188,10 +199,10 @@ public class GamesController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpPut("{gameId}/genres")]
+    [HttpPut("{gameId}/genres", Name = "UpsertGameGenres")]
     public async Task<ActionResult> UpsertGameGenres(string gameId, [FromBody] UpsertGameGenresDto upsertGameGenresDto)
     {
-        var game = await context.Games.Include(g => g.Genres).FirstOrDefaultAsync();
+        var game = await context.Games.Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game is null)
         {

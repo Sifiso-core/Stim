@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Stim.Api.Models.Developer;
 
-public class DeveloperQueryParameters
+public record DeveloperQueryParameters
 {
     [FromQuery(Name = "q")]
     public string? Search { get; set; }

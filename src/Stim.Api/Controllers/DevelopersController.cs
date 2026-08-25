@@ -9,15 +9,16 @@ using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Developer;
 using Stim.Api.Services.Data_Shaping;
+using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
 [Route("developers")]
 [ApiController]
-public class DevelopersController(ApplicationDbContext context) : ControllerBase
+public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Name = "GetDevelopers")]
     public async Task<IActionResult> GetDevelopers([FromQuery] DeveloperQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<DeveloperDto, Developer>(queries.Sort))
@@ -39,11 +40,15 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         var paginationResult = await developersQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
+        var links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+
+        paginationResult.Links = links;
+
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, d => hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields)),
+            Links = links
         };
-
 
         return Ok(result);
     }
@@ -63,9 +68,16 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
         }
         var result = dataShapingService.ShapeData(developer, fields);
 
+        var links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, developerId, fields);
+
+        result.TryAdd("links", links);
+
         return Ok(result);
     }
-    [HttpPost]
+
+
+
+    [HttpPost(Name = "CreateDeveloper")]
     public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto, [FromServices] IValidator<CreateDeveloperDto> validator)
     {
         await validator.ValidateAndThrowAsync(createDeveloperDto);
@@ -76,11 +88,13 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         await context.SaveChangesAsync();
 
-        var result = developer.ToDto();
+        var developerDto = developer.ToDto();
 
-        return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, result);
+        developerDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, developerDto.Id, null);
+
+        return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, developerDto);
     }
-    [HttpPut("{developerId}")]
+    [HttpPut("{developerId}", Name = "UpdateDeveloper")]
     public async Task<ActionResult> UpdateDeveloper(string developerId, [FromBody] UpdateDeveloperDto updateDeveloperDto, [FromServices] IValidator<UpdateDeveloperDto> validator)
     {
         await validator.ValidateAndThrowAsync(updateDeveloperDto);
@@ -98,7 +112,7 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpPatch("{developerId}")]
+    [HttpPatch("{developerId}", Name = "PatchDeveloper")]
     public async Task<ActionResult> PatchDeveloper(string developerId, JsonPatchDocument<DeveloperDto> document)
     {
         var developer = await context.Developers.FirstOrDefaultAsync(d => d.Id == developerId);
@@ -123,7 +137,7 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpDelete("{developerId}")]
+    [HttpDelete("{developerId}", Name = "DeleteDeveloper")]
     public async Task<ActionResult> DeleteDeveloper(string developerId)
     {
         var developer = await context.Developers.FirstOrDefaultAsync(d => d.Id == developerId);
@@ -140,5 +154,4 @@ public class DevelopersController(ApplicationDbContext context) : ControllerBase
         return NoContent();
 
     }
-
 }

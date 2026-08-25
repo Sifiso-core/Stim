@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Stim.Api.Models.Game;
 
-public class GameQueryParameters
+public record GameQueryParameters
 {
     [FromQuery(Name = "q")]
     public string? Search { get; set; }

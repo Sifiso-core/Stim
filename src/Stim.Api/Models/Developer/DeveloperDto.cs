@@ -1,4 +1,5 @@
 using System;
+using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 
 namespace Stim.Api.Models.Developer;
@@ -10,4 +11,5 @@ public class DeveloperDto
     public string? Description { get; set; }
     public string? WebsiteUrl { get; set; }
     public ICollection<GameDto> Games { get; set; } = [];
+    public List<LinkDto> Links { get; set; } = [];
 }

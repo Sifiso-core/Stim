@@ -10,6 +10,9 @@ using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
 using Stim.Api.Services.Data_Shaping;
+using Stim.Api.Services.Hateoas;
+using Stim.Api.Services.Hateoas.Developer;
+using Stim.Api.Services.Hateoas.Game;
 using Stim.Api.Services.Sorting;
 
 public static class DependencyInjection
@@ -53,6 +56,12 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ISortMappingDefinition, SortMappingDefinition<TagDto, Tag>>(_ => TagMappings.SortMapping);
 
         builder.Services.AddTransient<DataShapingService>();
+
+        builder.Services.AddHttpContextAccessor();
+
+        builder.Services.AddScoped<IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters>, DeveloperLinkBuilder>();
+        builder.Services.AddScoped<IHateoasLinkBuilder<GameDto, GameQueryParameters>, GameLinkBuilder>();
+
         return builder;
     }
     public static WebApplicationBuilder AddDatabase(this WebApplicationBuilder builder)
