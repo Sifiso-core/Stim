@@ -2,7 +2,7 @@ using Stim.Api.Controllers;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Genre;
 
-namespace Stim.Api.Services.Hateoas.Game;
+namespace Stim.Api.Services.Hateoas.Genre;
 
 public class GenreLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder<GenreDto, GenreQueryParameters>
 {

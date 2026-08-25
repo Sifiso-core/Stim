@@ -13,6 +13,7 @@ using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Hateoas.Developer;
 using Stim.Api.Services.Hateoas.Game;
+using Stim.Api.Services.Hateoas.Genre;
 using Stim.Api.Services.Sorting;
 
 public static class DependencyInjection
