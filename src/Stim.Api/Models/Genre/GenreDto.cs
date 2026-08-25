@@ -1,3 +1,5 @@
+using Stim.Api.Models.Common;
+
 namespace Stim.Api.Models.Genre;
 
 public class GenreDto
@@ -7,5 +9,6 @@ public class GenreDto
     public string? Description { get; set; }
     public string? ImageUrl { get; set; }
     public string Slug { get; set; } = string.Empty;
+    public List<LinkDto> Links { get; set; } = [];
 
 }

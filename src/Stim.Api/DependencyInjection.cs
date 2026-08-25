@@ -60,7 +60,10 @@ public static class DependencyInjection
         builder.Services.AddHttpContextAccessor();
 
         builder.Services.AddScoped<IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters>, DeveloperLinkBuilder>();
+
         builder.Services.AddScoped<IHateoasLinkBuilder<GameDto, GameQueryParameters>, GameLinkBuilder>();
+
+        builder.Services.AddScoped<IHateoasLinkBuilder<GenreDto, GenreQueryParameters>, GenreLinkBuilder>();
 
         return builder;
     }

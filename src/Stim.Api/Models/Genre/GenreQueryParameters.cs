@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Stim.Api.Models.Genre;
 
-public class GenreQueryParameters
+public record GenreQueryParameters
 {
     [FromQuery(Name = "q")]
     public string? Search { get; set; }

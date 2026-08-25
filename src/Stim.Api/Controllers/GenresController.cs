@@ -8,15 +8,16 @@ using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Services.Data_Shaping;
+using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
 [Route("genres")]
 [ApiController]
-public class GenresController(ApplicationDbContext context) : ControllerBase
+public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
-    [HttpGet]
+    [HttpGet(Name = "GetGenres")]
     public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
@@ -41,9 +42,14 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         var paginationResult = await genresQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
+        var links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+
+        paginationResult.Links = links;
+
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields)),
+            Links = links
         };
 
 
@@ -60,27 +66,60 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         var genre = await context.Genres.FirstOrDefaultAsync(g => isId ? g.Id == identifier : g.Slug == identifier.ToLower());
 
-        var result = genre?.ToDto();
+        if (genre is null)
+        {
+            return NotFound();
+        }
 
-        return Ok(result);
+        var genreDto = genre?.ToDto();
+
+        genreDto!.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
+
+        return Ok(genreDto);
     }
-    [HttpGet("{slug}/games")]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGamesByGenreSlug(string slug)
+    [HttpGet("{slug}/games", Name = "GetGamesByGenreSlug")]
+    public async Task<IActionResult> GetGamesByGenreSlug(string slug, GameQueryParameters queries,
+    [FromServices] SortMappingProvider sortMappingProvider,
+    [FromServices] DataShapingService dataShapingService,
+    [FromServices] IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+    [FromServices] IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
     {
+        if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
+        }
+        if (!dataShapingService.Validate<GameDto>(queries.Fields))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
+        }
+
+        var sortMappings = sortMappingProvider.GetMappings<GameDto, Game>();
+
         var normalisedString = slug.ToLower();
 
-        var games = await context.Games.Where(game => game.Genres.Any(g => g.Slug == normalisedString))
+        var paginationResult = await context.Games.Where(game => game.Genres.Any(g => g.Slug == normalisedString))
                                                       .Select(GameQueries.ProjectToGameDto())
-                                                      .ToListAsync();
+                                                      .ApplySort(queries.Sort, sortMappings).ToPaginationResultAsync(queries.Page, queries.PageSize);
 
-        var result = new DataCollectionResponse<GameDto>
+        var links = gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+
+        var result = new DataCollectionResponse<ExpandoObject>
         {
-            Data = games
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, d =>
+            {
+                foreach (var genre in d.Genres)
+                {
+                    genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
+                }
+                return gameLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
+            }),
+
+            Links = links
         };
 
         return Ok(result);
     }
-    [HttpPost]
+    [HttpPost(Name = "CreateGenre")]
     public async Task<ActionResult<GenreDto>> CreateGenre([FromBody] CreateGenreDto createGenreDto, [FromServices] IValidator<CreateGenreDto> validator)
     {
 
@@ -92,11 +131,13 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         await context.SaveChangesAsync();
 
-        var result = genre.ToDto();
+        var genreDto = genre.ToDto();
 
-        return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, result);
+        genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
+
+        return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, genreDto);
     }
-    [HttpPut("{genreId}")]
+    [HttpPut("{genreId}", Name = "UpdateGenre")]
     public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto, [FromServices] IValidator<UpdateGenreDto> validator)
     {
 
@@ -115,7 +156,7 @@ public class GenresController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpDelete("{genreId}")]
+    [HttpDelete("{genreId}", Name = "DeleteGenre")]
     public async Task<ActionResult> DeleteGenre(string genreId)
     {
         var genre = await context.Genres.FirstOrDefaultAsync(g => g.Id == genreId);
