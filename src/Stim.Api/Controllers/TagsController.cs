@@ -8,25 +8,28 @@ using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
 using Stim.Api.Services.Data_Shaping;
+using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
 [Route("tags")]
 [ApiController]
-public class TagsController(ApplicationDbContext context) : ControllerBase
+public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<TagDto, TagQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
-    [HttpGet]
-    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags([FromBody] TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    [HttpGet(Name = "GetTags")]
+    public async Task<IActionResult> GetTags(TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<TagDto, Tag>(queries.Sort))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
         }
+
         if (!dataShapingService.Validate<TagDto>(queries.Fields))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
         }
+
         var sortMappings = sortMappingProvider.GetMappings<TagDto, Tag>();
 
         var search = queries.Search?.Trim().ToLower();
@@ -39,7 +42,9 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields)
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, t => hateoasLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields)),
+
+            Links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage)
         };
 
         return Ok(result);
@@ -57,10 +62,13 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
         {
             return NotFound();
         }
+        var tagDto = tag.ToDto();
 
-        return Ok(tag);
+        tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, fields);
+
+        return Ok(tagDto);
     }
-    [HttpPost]
+    [HttpPost(Name = "CreateTag")]
     public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto, [FromServices] IValidator<CreateTagDto> validator)
     {
 
@@ -70,17 +78,20 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
         {
             return BadRequest("The tag with the provided name already exists");
         }
+
         var tag = createTagDto.ToEntity();
 
         await context.Tags.AddAsync(tag);
 
         await context.SaveChangesAsync();
 
-        var result = tag.ToDto();
+        var tagDto = tag.ToDto();
 
-        return CreatedAtRoute("GetTag", new { tagId = tag.Id }, result);
+        tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, null);
+
+        return CreatedAtRoute("GetTag", new { tagId = tag.Id }, tagDto);
     }
-    [HttpPut("{tagId}")]
+    [HttpPut("{tagId}", Name = "UpdateTag")]
     public async Task<ActionResult> UpdateTag(string tagId, [FromBody] UpdateTagDto updateTagDto, [FromServices] IValidator<UpdateTagDto> validator)
     {
 
@@ -99,7 +110,7 @@ public class TagsController(ApplicationDbContext context) : ControllerBase
 
         return NoContent();
     }
-    [HttpDelete("{tagId}")]
+    [HttpDelete("{tagId}", Name = "DeleteTag")]
     public async Task<ActionResult> DeleteTag(string tagId)
     {
         var tag = await context.Tags.FirstOrDefaultAsync(t => t.Id == tagId);

@@ -14,6 +14,7 @@ using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Hateoas.Developer;
 using Stim.Api.Services.Hateoas.Game;
 using Stim.Api.Services.Hateoas.Genre;
+using Stim.Api.Services.Hateoas.Tag;
 using Stim.Api.Services.Sorting;
 
 public static class DependencyInjection
@@ -65,6 +66,8 @@ public static class DependencyInjection
         builder.Services.AddScoped<IHateoasLinkBuilder<GameDto, GameQueryParameters>, GameLinkBuilder>();
 
         builder.Services.AddScoped<IHateoasLinkBuilder<GenreDto, GenreQueryParameters>, GenreLinkBuilder>();
+
+        builder.Services.AddScoped<IHateoasLinkBuilder<TagDto, TagQueryParameters>, TagLinkBuilder>();
 
         return builder;
     }
