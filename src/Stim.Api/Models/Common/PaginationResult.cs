@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace Stim.Api.Models.Common;
 
 public class PaginationResult<T>
@@ -9,6 +11,7 @@ public class PaginationResult<T>
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
     public bool HasPreviousPage => Page > 1;
     public bool HasNextPage => Page < TotalPages;
-    public List<LinkDto> Links { get; set; } = [];
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public List<LinkDto>? Links { get; set; }
 
 }

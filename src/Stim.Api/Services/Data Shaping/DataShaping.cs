@@ -29,6 +29,12 @@ public class DataShapingService
             IDictionary<string, object?> shapedObject = new ExpandoObject();
             foreach (var propertyInfo in propertyInfos)
             {
+                if (propertyInfo.Name.Equals(
+                    "Links",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 shapedObject[propertyInfo.Name] = propertyInfo.GetValue(entity);
             }
             if (linkDtosFactory is not null)

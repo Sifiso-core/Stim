@@ -1,4 +1,4 @@
-using System;
+using Newtonsoft.Json;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 
@@ -11,5 +11,6 @@ public class DeveloperDto
     public string? Description { get; set; }
     public string? WebsiteUrl { get; set; }
     public ICollection<GameDto> Games { get; set; } = [];
-    public List<LinkDto> Links { get; set; } = [];
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public List<LinkDto>? Links { get; set; }
 }

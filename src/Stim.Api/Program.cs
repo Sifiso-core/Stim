@@ -1,3 +1,5 @@
+using Stim.Api;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddControllers()
