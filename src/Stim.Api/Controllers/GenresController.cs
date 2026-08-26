@@ -7,6 +7,7 @@ using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
@@ -17,6 +18,7 @@ namespace Stim.Api.Controllers;
 [ApiController]
 public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
+    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
     [HttpGet(Name = "GetGenres")]
     public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
@@ -42,16 +44,22 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var paginationResult = await genresQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
-        var links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+        var links = new List<LinkDto>();
 
-        paginationResult.Links = links;
+        if (IncludeHateoasLinks)
+        {
+            links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
+
+            paginationResult.Links = links;
+
+        }
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields)),
-            Links = links
-        };
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields) : null),
 
+            Links = IncludeHateoasLinks ? links : null
+        };
 
         return Ok(result);
     }
@@ -71,9 +79,12 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
             return NotFound();
         }
 
-        var genreDto = genre?.ToDto();
+        var genreDto = genre.ToDto();
 
-        genreDto!.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
+        if (IncludeHateoasLinks)
+        {
+            genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
+        }
 
         return Ok(genreDto);
     }
@@ -101,20 +112,26 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
                                                       .Select(GameQueries.ProjectToGameDto())
                                                       .ApplySort(queries.Sort, sortMappings).ToPaginationResultAsync(queries.Page, queries.PageSize);
 
-        var links = gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+        var links = new List<LinkDto>();
+
+        if (IncludeHateoasLinks)
+        {
+            links.AddRange(gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
+        }
 
         var result = new DataCollectionResponse<ExpandoObject>
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, d =>
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? d =>
             {
                 foreach (var genre in d.Genres)
                 {
                     genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
                 }
                 return gameLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
-            }),
+            }
+            : null),
 
-            Links = links
+            Links = IncludeHateoasLinks ? links : null
         };
 
         return Ok(result);
@@ -133,7 +150,10 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var genreDto = genre.ToDto();
 
-        genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
+        if (IncludeHateoasLinks)
+        {
+            genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
+        }
 
         return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, genreDto);
     }

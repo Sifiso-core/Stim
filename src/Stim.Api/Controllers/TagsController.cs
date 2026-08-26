@@ -7,6 +7,7 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
@@ -17,6 +18,7 @@ namespace Stim.Api.Controllers;
 [ApiController]
 public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<TagDto, TagQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
+    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
     [HttpGet(Name = "GetTags")]
     public async Task<IActionResult> GetTags(TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
@@ -42,9 +44,9 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, t => hateoasLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields)),
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? t => hateoasLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields) : null),
 
-            Links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage)
+            Links = IncludeHateoasLinks ? hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage) : null
         };
 
         return Ok(result);
@@ -64,14 +66,16 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
         }
         var tagDto = tag.ToDto();
 
-        tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, fields);
+        if (IncludeHateoasLinks)
+        {
+            tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, fields);
+        }
 
         return Ok(tagDto);
     }
     [HttpPost(Name = "CreateTag")]
     public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto, [FromServices] IValidator<CreateTagDto> validator)
     {
-
         await validator.ValidateAndThrowAsync(createTagDto);
 
         if (await context.Tags.AnyAsync(t => t.Name.Equals(createTagDto.Name)))
@@ -87,7 +91,10 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         var tagDto = tag.ToDto();
 
-        tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, null);
+        if (IncludeHateoasLinks)
+        {
+            tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, null);
+        }
 
         return CreatedAtRoute("GetTag", new { tagId = tag.Id }, tagDto);
     }
