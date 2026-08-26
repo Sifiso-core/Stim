@@ -122,7 +122,11 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         var developerDto = developer.ToDto();
 
-        developerDto.Links = developerLinkBuilder.CreateLinksForResource(HttpContext, developerDto.Id, null);
+        if (IncludeHateoasLinks)
+        {
+            developerDto.Links = developerLinkBuilder.CreateLinksForResource(HttpContext, developerDto.Id, null);
+        }
+
 
         return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, developerDto);
     }

@@ -9,6 +9,7 @@ using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
@@ -19,8 +20,10 @@ namespace Stim.Api.Controllers;
 [ApiController]
 public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
+    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
+
     [HttpGet(Name = "GetGames")]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
     {
         if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
         {
@@ -41,14 +44,25 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         var paginationResult = await gamesQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
-        var links = hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage);
+        var links = new List<LinkDto>();
 
-        paginationResult.Links = links;
+        if (IncludeHateoasLinks)
+        {
+            links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
+
+            paginationResult.Links = links;
+
+        }
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, d => hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields)),
-            Links = links
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? d =>
+            {
+                d.Genres.ForEach(g => g.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields));
+                return hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
+            }
+            : null),
+            Links = IncludeHateoasLinks ? links : null
         };
 
         return Ok(result);
@@ -68,9 +82,11 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         }
         var gameDto = game.ToDto();
 
-        var links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
+        if (IncludeHateoasLinks)
+        {
+            gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
 
-        gameDto.Links = links;
+        }
 
         return Ok(gameDto);
     }
@@ -90,9 +106,14 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         await context.SaveChangesAsync();
 
-        var links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
+        var gameDto = game.ToDto();
 
-        return CreatedAtRoute("GetGame", new { gameId = game.Id }, game.ToDto());
+        if (IncludeHateoasLinks)
+        {
+            gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
+        }
+
+        return CreatedAtRoute("GetGame", new { gameId = game.Id }, gameDto);
     }
     [HttpPut("{gameId}", Name = "UpdateGame")]
     public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto, [FromServices] IValidator<UpdateGameDto> validator)
