@@ -62,6 +62,10 @@ public class DataShapingService
 
         foreach (var propertyInfo in propertyInfos)
         {
+            if (propertyInfo.Name.Equals("Links", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
             shapedObject[propertyInfo.Name] = propertyInfo.GetValue(entity);
         }
 

@@ -22,6 +22,7 @@ namespace Stim.Api.Controllers;
 [ApiController]
 public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters> developerLinkBuilder) : ControllerBase
 {
+    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
     [HttpGet(Name = "GetDevelopers")]
     public async Task<IActionResult> GetDevelopers([FromQuery] DeveloperQueryParameters queries,
      SortMappingProvider sortMappingProvider,
@@ -47,13 +48,12 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
                                                                     .ApplySort(queries.Sort, sortMappings)
                                                                     .Select(DeveloperQueries.ProjectToDto());
 
-        var includeHateoasLinks = Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
 
         var paginationResult = await developersQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
 
         List<LinkDto> links = [];
 
-        if (includeHateoasLinks)
+        if (IncludeHateoasLinks)
         {
             links.AddRange(developerLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
             paginationResult.Links = links;
@@ -61,33 +61,23 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, includeHateoasLinks ? d =>
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? d =>
         {
             foreach (var game in d.Games)
             {
-                game.Links = gameLinkBuilder.CreateLinksForResource(
-                    HttpContext,
-                    game.Id,
-                    queries.Fields);
+                game.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, game.Id, queries.Fields);
 
-                game.Tags.ForEach(t =>
-                    t.Links = tagLinkBuilder.CreateLinksForResource(
-                        HttpContext,
-                        t.Id,
-                        queries.Fields));
+                game.Tags.ForEach(t => t.Links = tagLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields));
 
-                game.Genres.ForEach(g =>
-                    g.Links = genreLinkBuilder.CreateLinksForResource(
-                        HttpContext,
-                        g.Id,
-                        queries.Fields));
+                game.Genres.ForEach(g => g.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields));
             }
 
             return developerLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
         }
             : null),
 
-            Links = includeHateoasLinks ? links : null
+            Links = IncludeHateoasLinks ? links : null
+
         };
 
         return Ok(result);
@@ -108,9 +98,11 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
         }
         var result = dataShapingService.ShapeData(developer, fields);
 
-        var links = developerLinkBuilder.CreateLinksForResource(HttpContext, developerId, fields);
+        if (IncludeHateoasLinks)
+        {
+            result.TryAdd("links", developerLinkBuilder.CreateLinksForResource(HttpContext, developerId, fields));
 
-        result.TryAdd("links", links);
+        }
 
         return Ok(result);
     }
