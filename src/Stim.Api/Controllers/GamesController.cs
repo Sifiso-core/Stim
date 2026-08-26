@@ -1,4 +1,5 @@
 using System.Dynamic;
+using Asp.Versioning;
 using FluentValidation;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,7 @@ namespace Stim.Api.Controllers;
 
 [Route("games")]
 [ApiController]
+[ApiVersion(1.0)]
 public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
     private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);

@@ -1,4 +1,5 @@
 using System.Dynamic;
+using Asp.Versioning;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ namespace Stim.Api.Controllers;
 
 [Route("genres")]
 [ApiController]
+[ApiVersion(1.0)]
 public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
     private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);

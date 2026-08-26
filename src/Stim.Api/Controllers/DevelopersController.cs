@@ -1,6 +1,6 @@
 using System.Dynamic;
+using Asp.Versioning;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +20,7 @@ namespace Stim.Api.Controllers;
 
 [Route("developers")]
 [ApiController]
+[ApiVersion(1.0)]
 public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters> developerLinkBuilder) : ControllerBase
 {
     private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
@@ -106,8 +107,6 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return Ok(result);
     }
-
-
 
     [HttpPost(Name = "CreateDeveloper")]
     public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto, [FromServices] IValidator<CreateDeveloperDto> validator)

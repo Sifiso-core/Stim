@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -25,7 +26,7 @@ namespace Stim.Api
 {
     public static class DependencyInjection
     {
-        public static WebApplicationBuilder AddControllers(this WebApplicationBuilder builder)
+        public static WebApplicationBuilder AddAPICoreServices(this WebApplicationBuilder builder)
         {
 
             builder.Services.AddControllers().AddNewtonsoftJson(options =>
@@ -37,6 +38,10 @@ namespace Stim.Api
             {
                 var formatter = options.OutputFormatters.OfType<NewtonsoftJsonOutputFormatter>().First();
                 formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJsonMediaType);
+                formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJsonMediaTypeV1);
+                formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJsonMediaTypeV2);
+                formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.JsonV1);
+                formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.JsonV2);
             });
 
             builder.Services.AddProblemDetails();
@@ -44,6 +49,15 @@ namespace Stim.Api
             builder.Services.AddSwaggerGen();
 
             builder.Services.AddOpenApi();
+
+            builder.Services.AddApiVersioning(options =>
+            {
+                options.AssumeDefaultVersionWhenUnspecified = true;
+                options.DefaultApiVersion = new ApiVersion(1.0);
+                options.ReportApiVersions = true;
+                options.ApiVersionReader = ApiVersionReader.Combine(new MediaTypeApiVersionReader(),
+                new MediaTypeApiVersionReaderBuilder().Template("application/vnd.stim.hateoas.{version}+json").Build());
+            }).AddMvc();
 
             return builder;
         }

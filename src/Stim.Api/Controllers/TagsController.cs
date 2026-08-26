@@ -1,6 +1,6 @@
 using System.Dynamic;
+using Asp.Versioning;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
@@ -16,6 +16,7 @@ namespace Stim.Api.Controllers;
 
 [Route("tags")]
 [ApiController]
+[ApiVersion(1.0)]
 public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<TagDto, TagQueryParameters> hateoasLinkBuilder) : ControllerBase
 {
     private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
