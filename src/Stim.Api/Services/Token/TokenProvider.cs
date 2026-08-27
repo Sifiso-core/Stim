@@ -1,5 +1,6 @@
 using System;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -48,9 +49,11 @@ public class TokenProvider(IOptions<JwtAuthOptions> options)
         return new JsonWebTokenHandler().CreateToken(tokenDescriptor);
 
     }
-    private string RefreshTokenGenerator()
+    private static string RefreshTokenGenerator()
     {
-        return string.Empty;
+        var randomBytes = RandomNumberGenerator.GetBytes(32);
+
+        return Convert.ToHexString(randomBytes);
     }
 
 }

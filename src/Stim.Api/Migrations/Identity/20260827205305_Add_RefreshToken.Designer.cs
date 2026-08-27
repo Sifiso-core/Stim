@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Stim.Api.Data;
@@ -11,9 +12,11 @@ using Stim.Api.Data;
 namespace Stim.Api.Migrations.Identity
 {
     [DbContext(typeof(ApplicationIdentityDbContext))]
-    partial class ApplicationIdentityDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260827205305_Add_RefreshToken")]
+    partial class Add_RefreshToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -227,9 +230,6 @@ namespace Stim.Api.Migrations.Identity
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsRevoked")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Token")
                         .IsRequired()

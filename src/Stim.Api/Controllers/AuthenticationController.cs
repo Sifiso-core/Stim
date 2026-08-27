@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Options;
 using Stim.Api.Data;
+using Stim.Api.Entities;
 using Stim.Api.Extensions;
 using Stim.Api.Models.Authentication;
 using Stim.Api.Models.User;
+using Stim.Api.Options;
 using Stim.Api.Services.Token;
 
 namespace Stim.Api.Controllers;
@@ -17,8 +20,11 @@ namespace Stim.Api.Controllers;
 public class AuthenticationController(UserManager<IdentityUser> userManager,
 ApplicationIdentityDbContext identityDbContext,
 ApplicationDbContext applicationDbContext,
-TokenProvider tokenProvider) : ControllerBase
+TokenProvider tokenProvider,
+IOptions<JwtAuthOptions> options) : ControllerBase
 {
+    private readonly JwtAuthOptions options = options.Value;
+
     [HttpPost("register")]
     public async Task<IActionResult> RegisterUser(RegisterUserDto registerUserDto)
     {
@@ -47,11 +53,24 @@ TokenProvider tokenProvider) : ControllerBase
 
         await applicationDbContext.SaveChangesAsync();
 
-        await transaction.CommitAsync();
-
         TokenRequest tokenRequest = new(identityUser.Id, identityUser.Email);
 
         var tokens = tokenProvider.Create(tokenRequest);
+
+
+        var refreshToken = new RefreshToken
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = identityUser.Id,
+            Token = tokens.AccessToken,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(options.RefreshTokenExpirationDays)
+        };
+
+        await identityDbContext.RefreshTokens.AddAsync(refreshToken);
+
+        await identityDbContext.SaveChangesAsync();
+
+        await transaction.CommitAsync();
 
         return Ok(tokens);
     }
@@ -85,10 +104,45 @@ TokenProvider tokenProvider) : ControllerBase
             return Unauthorized();
         }
 
-        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email);
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!);
 
         var tokens = tokenProvider.Create(tokenRequest);
 
+        var refreshToken = new RefreshToken
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = identityUser.Id,
+            Token = tokens.RefreshToken,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(options.RefreshTokenExpirationDays)
+        };
+
+        await identityDbContext.RefreshTokens.AddAsync(refreshToken);
+
+        await identityDbContext.SaveChangesAsync();
+
         return Ok(tokens);
+    }
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AccessTokenDto>> Refresh([FromBody] RefreshTokenDto refreshTokenDto)
+    {
+        var refreshToken = await identityDbContext.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(rt => rt.Token == refreshTokenDto.RefreshToken);
+
+        if (refreshToken is null || refreshToken.IsRevoked || refreshToken.ExpiresAtUtc < DateTime.UtcNow)
+        {
+            return Unauthorized();
+        }
+
+        var tokenRequest = new TokenRequest(refreshToken.User.Id, refreshToken.User.Email!);
+
+        var tokens = tokenProvider.Create(tokenRequest);
+
+        refreshToken.Token = tokens.RefreshToken;
+
+        refreshToken.ExpiresAtUtc = DateTime.UtcNow.AddDays(options.RefreshTokenExpirationDays);
+
+        await identityDbContext.SaveChangesAsync();
+
+        return Ok(tokens);
+
     }
 }
