@@ -18,4 +18,5 @@ public class ApplicationDbContext : DbContext
     public DbSet<Tag> Tags { get; set; }
     public DbSet<GameTag> GameTags { get; set; }
     public DbSet<Genre> Genres { get; set; }
+    public DbSet<Entities.User> Users { get; set; }
 }

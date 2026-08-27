@@ -5,7 +5,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddAPICoreServices()
         .AddDatabase()
         .AddErrorHandling()
-        .AddApplicationServices();
+        .AddApplicationServices()
+        .AddAuthenticationServices();
 
 var app = builder.Build();
 
@@ -19,6 +20,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseExceptionHandler();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

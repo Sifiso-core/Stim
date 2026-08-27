@@ -1,9 +1,13 @@
+using System.Text;
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Serialization;
 using Stim.Api;
 using Stim.Api.Data;
@@ -13,6 +17,7 @@ using Stim.Api.Models.Developer;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
+using Stim.Api.Options;
 using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
@@ -21,6 +26,7 @@ using Stim.Api.Services.Hateoas.Game;
 using Stim.Api.Services.Hateoas.Genre;
 using Stim.Api.Services.Hateoas.Tag;
 using Stim.Api.Services.Sorting;
+using Stim.Api.Services.Token;
 
 namespace Stim.Api
 {
@@ -96,6 +102,8 @@ namespace Stim.Api
 
             builder.Services.AddScoped<IHateoasLinkBuilder<TagDto, TagQueryParameters>, TagLinkBuilder>();
 
+            builder.Services.AddScoped<TokenProvider>();
+
             return builder;
         }
         public static WebApplicationBuilder AddDatabase(this WebApplicationBuilder builder)
@@ -104,6 +112,46 @@ namespace Stim.Api
             {
                 options.UseNpgsql(builder.Configuration.GetConnectionString("postgresConnection"), npgsqlOptions => npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Application));
             });
+            builder.Services.AddDbContext<ApplicationIdentityDbContext>(options =>
+            {
+                options.UseNpgsql(builder.Configuration.GetConnectionString("postgresConnection"), npgsqlOptions => npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Identity));
+            });
+            return builder;
+        }
+        public static WebApplicationBuilder AddAuthenticationServices(this WebApplicationBuilder builder)
+        {
+            builder.Services.Configure<JwtAuthOptions>(builder.Configuration.GetSection("JwtAuth"));
+
+            var jwtAuthOptions = builder.Configuration.GetSection("JwtAuth").Get<JwtAuthOptions>();
+
+            builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
+            {
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 3;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = false;
+                options.Password.RequireDigit = true;
+                options.Password.RequiredLength = 8;
+                options.Password.RequireNonAlphanumeric = true;
+            }).AddEntityFrameworkStores<ApplicationIdentityDbContext>();
+
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters()
+                {
+                    ValidIssuer = jwtAuthOptions!.Issuer,
+                    ValidAudience = jwtAuthOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtAuthOptions.Key))
+                };
+            });
+
+            builder.Services.AddAuthorization();
+
             return builder;
         }
     }
