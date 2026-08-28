@@ -13,6 +13,7 @@ using Stim.Api;
 using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Middleware;
+using Stim.Api.Models.Commnet;
 using Stim.Api.Models.Developer;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
@@ -21,12 +22,14 @@ using Stim.Api.Options;
 using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
+using Stim.Api.Services.Hateoas.Comment;
 using Stim.Api.Services.Hateoas.Developer;
 using Stim.Api.Services.Hateoas.Game;
 using Stim.Api.Services.Hateoas.Genre;
 using Stim.Api.Services.Hateoas.Tag;
 using Stim.Api.Services.Sorting;
 using Stim.Api.Services.Token;
+using Stim.Api.Services.User_Context;
 
 namespace Stim.Api
 {
@@ -94,6 +97,10 @@ namespace Stim.Api
 
             builder.Services.AddHttpContextAccessor();
 
+            builder.Services.AddMemoryCache();
+
+            builder.Services.AddScoped<UserContext>();
+
             builder.Services.AddScoped<IHateoasLinkBuilder<DeveloperDto, DeveloperQueryParameters>, DeveloperLinkBuilder>();
 
             builder.Services.AddScoped<IHateoasLinkBuilder<GameDto, GameQueryParameters>, GameLinkBuilder>();
@@ -101,6 +108,8 @@ namespace Stim.Api
             builder.Services.AddScoped<IHateoasLinkBuilder<GenreDto, GenreQueryParameters>, GenreLinkBuilder>();
 
             builder.Services.AddScoped<IHateoasLinkBuilder<TagDto, TagQueryParameters>, TagLinkBuilder>();
+
+            builder.Services.AddScoped<IHateoasLinkBuilder<CommentDto, CommentQueryParameters>, CommentLinkBuilder>();
 
             builder.Services.AddScoped<TokenProvider>();
 

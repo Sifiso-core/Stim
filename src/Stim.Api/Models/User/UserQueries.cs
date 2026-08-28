@@ -10,8 +10,8 @@ public static class UserQueries
         {
             Id = u.Id,
             Email = u.Email,
-            Password = u.Password,
             CreatedAtUtc = u.CreatedAtUtc,
+            Name = u.Name
         };
     }
 }
