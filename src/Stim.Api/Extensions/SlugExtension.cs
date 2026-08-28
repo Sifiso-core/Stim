@@ -15,3 +15,4 @@ public static class SlugExtension
         return slugHelper.GenerateSlug(input);
     }
 }
+

@@ -1,4 +1,5 @@
 using Stim.Api;
+using Stim.Api.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    await app.ApplyMigrationsAsync();
 }
 
 app.UseHttpsRedirection();
