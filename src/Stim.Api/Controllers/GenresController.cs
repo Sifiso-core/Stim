@@ -1,6 +1,7 @@
 using System.Dynamic;
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
@@ -14,6 +15,7 @@ using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Member)]
 [Route("genres")]
 [ApiController]
 [ApiVersion(1.0)]
@@ -137,6 +139,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         return Ok(result);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateGenre")]
     public async Task<ActionResult<GenreDto>> CreateGenre([FromBody] CreateGenreDto createGenreDto, [FromServices] IValidator<CreateGenreDto> validator)
     {
@@ -158,6 +161,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, genreDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{genreId}", Name = "UpdateGenre")]
     public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto, [FromServices] IValidator<UpdateGenreDto> validator)
     {
@@ -177,6 +181,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{genreId}", Name = "DeleteGenre")]
     public async Task<ActionResult> DeleteGenre(string genreId)
     {

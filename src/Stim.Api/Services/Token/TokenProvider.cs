@@ -15,7 +15,6 @@ public class TokenProvider(IOptions<JwtAuthOptions> options)
     private readonly JwtAuthOptions options = options.Value;
     public AccessTokenDto Create(TokenRequest tokenRequest)
     {
-
         return new(AccessTokenGenerator(tokenRequest), RefreshTokenGenerator());
     }
     private string AccessTokenGenerator(TokenRequest tokenRequest)
@@ -30,12 +29,13 @@ public class TokenProvider(IOptions<JwtAuthOptions> options)
 
         var signingCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new List<Claim>()
-        {
+        List<Claim> claims =
+        [
             new(JwtRegisteredClaimNames.Sub,tokenRequest.UserId),
             new(JwtRegisteredClaimNames.Email,tokenRequest.Email),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            .. tokenRequest.Roles.Select(role => new Claim(ClaimTypes.Role, role)),
+        ];
 
         var tokenDescriptor = new SecurityTokenDescriptor()
         {

@@ -1,6 +1,7 @@
 using System.Dynamic;
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,7 @@ using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Member)]
 [Route("developers")]
 [ApiController]
 [ApiVersion(1.0)]
@@ -106,7 +108,7 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return Ok(result);
     }
-
+    [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateDeveloper")]
     public async Task<ActionResult<DeveloperDto>> CreateDeveloper([FromBody] CreateDeveloperDto createDeveloperDto, [FromServices] IValidator<CreateDeveloperDto> validator)
     {
@@ -128,6 +130,7 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return CreatedAtRoute("GetDeveloper", new { developerId = developer.Id }, developerDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{developerId}", Name = "UpdateDeveloper")]
     public async Task<ActionResult> UpdateDeveloper(string developerId, [FromBody] UpdateDeveloperDto updateDeveloperDto, [FromServices] IValidator<UpdateDeveloperDto> validator)
     {
@@ -146,6 +149,7 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPatch("{developerId}", Name = "PatchDeveloper")]
     public async Task<ActionResult> PatchDeveloper(string developerId, JsonPatchDocument<DeveloperDto> document)
     {
@@ -171,6 +175,7 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{developerId}", Name = "DeleteDeveloper")]
     public async Task<ActionResult> DeleteDeveloper(string developerId)
     {

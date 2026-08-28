@@ -8,6 +8,7 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Extensions;
 using Stim.Api.Models.Authentication;
+using Stim.Api.Models.Common;
 using Stim.Api.Models.User;
 using Stim.Api.Options;
 using Stim.Api.Services.Token;
@@ -38,13 +39,22 @@ IOptions<JwtAuthOptions> options) : ControllerBase
             UserName = registerUserDto.Email
         };
 
-        var identityResult = await userManager.CreateAsync(identityUser, registerUserDto.Password);
+        var createUserResult = await userManager.CreateAsync(identityUser, registerUserDto.Password);
 
-        if (!identityResult.Succeeded)
+        if (!createUserResult.Succeeded)
         {
-            identityResult.AddToModelState(ModelState);
+            createUserResult.AddToModelState(ModelState);
 
             return ValidationProblem(ModelState);
+        }
+
+        var addToRoleResult = await userManager.AddToRoleAsync(identityUser, Roles.Member);
+
+        if (!addToRoleResult.Succeeded)
+        {
+            addToRoleResult.AddToModelState(ModelState);
+
+            return Problem("Unable To Assign Role To User");
         }
 
         var user = registerUserDto.ToEntity(identityUser.Id);
@@ -53,7 +63,7 @@ IOptions<JwtAuthOptions> options) : ControllerBase
 
         await applicationDbContext.SaveChangesAsync();
 
-        TokenRequest tokenRequest = new(identityUser.Id, identityUser.Email);
+        TokenRequest tokenRequest = new(identityUser.Id, identityUser.Email, [Roles.Member]);
 
         var tokens = tokenProvider.Create(tokenRequest);
 
@@ -104,7 +114,9 @@ IOptions<JwtAuthOptions> options) : ControllerBase
             return Unauthorized();
         }
 
-        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!);
+        var roles = await userManager.GetRolesAsync(identityUser);
+
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!, roles);
 
         var tokens = tokenProvider.Create(tokenRequest);
 
@@ -132,7 +144,9 @@ IOptions<JwtAuthOptions> options) : ControllerBase
             return Unauthorized();
         }
 
-        var tokenRequest = new TokenRequest(refreshToken.User.Id, refreshToken.User.Email!);
+        var roles = await userManager.GetRolesAsync(refreshToken.User);
+
+        var tokenRequest = new TokenRequest(refreshToken.User.Id, refreshToken.User.Email!, roles);
 
         var tokens = tokenProvider.Create(tokenRequest);
 

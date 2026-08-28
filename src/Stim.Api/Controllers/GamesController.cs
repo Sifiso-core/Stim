@@ -1,6 +1,7 @@
 using System.Dynamic;
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Member)]
 [Route("games")]
 [ApiController]
 [ApiVersion(1.0)]
@@ -91,6 +93,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return Ok(gameDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateGame")]
     public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createGameDto, [FromServices] IValidator<CreateGameDto> validator)
     {
@@ -116,6 +119,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return CreatedAtRoute("GetGame", new { gameId = game.Id }, gameDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}", Name = "UpdateGame")]
     public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto, [FromServices] IValidator<UpdateGameDto> validator)
     {
@@ -139,6 +143,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPatch("{gameId}", Name = "PatchGame")]
 
     public async Task<ActionResult> PatchGame(string gameId, JsonPatchDocument<GameDto> document)
@@ -165,7 +170,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return NoContent();
     }
-
+    [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{gameId}", Name = "DeleteGame")]
     public async Task<ActionResult> DeleteGame(string gameId)
     {
@@ -182,6 +187,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}/tags", Name = "UpsertGameTags")]
     public async Task<ActionResult> UpsertGameTags(string gameId, [FromBody] UpsertGameTagDto upsertGameTagDto)
     {
@@ -221,6 +227,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}/genres", Name = "UpsertGameGenres")]
     public async Task<ActionResult> UpsertGameGenres(string gameId, [FromBody] UpsertGameGenresDto upsertGameGenresDto)
     {

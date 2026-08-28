@@ -1,13 +1,15 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
+using Stim.Api.Models.Common;
 using Stim.Api.Models.User;
 using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Admin)]
 [Route("users")]
 [ApiController]
 [ApiVersion(1.0)]

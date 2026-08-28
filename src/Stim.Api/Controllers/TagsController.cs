@@ -1,6 +1,7 @@
 using System.Dynamic;
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
@@ -13,6 +14,7 @@ using Stim.Api.Services.Sorting;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Member)]
 [Route("tags")]
 [ApiController]
 [ApiVersion(1.0)]
@@ -73,6 +75,7 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         return Ok(tagDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateTag")]
     public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto, [FromServices] IValidator<CreateTagDto> validator)
     {
@@ -98,6 +101,7 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         return CreatedAtRoute("GetTag", new { tagId = tag.Id }, tagDto);
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpPut("{tagId}", Name = "UpdateTag")]
     public async Task<ActionResult> UpdateTag(string tagId, [FromBody] UpdateTagDto updateTagDto, [FromServices] IValidator<UpdateTagDto> validator)
     {
@@ -117,6 +121,7 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         return NoContent();
     }
+    [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{tagId}", Name = "DeleteTag")]
     public async Task<ActionResult> DeleteTag(string tagId)
     {

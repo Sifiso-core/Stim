@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
@@ -10,6 +11,7 @@ using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
+[Authorize(Roles = Roles.Member)]
 [Route("games/{gameId}/comments")]
 [ApiController]
 [ApiVersion(1.0)]
