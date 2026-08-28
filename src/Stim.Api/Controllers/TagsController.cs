@@ -7,7 +7,6 @@ using Stim.Api.Data;
 using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
-using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;

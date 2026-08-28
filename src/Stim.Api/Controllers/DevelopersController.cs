@@ -11,7 +11,6 @@ using Stim.Api.Models.Developer;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
-using Stim.Api.Services;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;

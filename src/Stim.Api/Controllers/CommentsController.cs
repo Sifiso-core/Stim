@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
 using Stim.Api.Models.Commnet;
 using Stim.Api.Models.Common;
-using Stim.Api.Services;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Sorting;
 using Stim.Api.Services.User_Context;

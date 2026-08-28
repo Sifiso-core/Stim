@@ -1,6 +1,6 @@
 using System;
 
-namespace Stim.Api.Services;
+namespace Stim.Api.Models.Common;
 
 public class CustomMediaTypeNames
 {
