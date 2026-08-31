@@ -31,7 +31,9 @@ public static class DatabaseExtensions
     public static async Task SeedInitialDataAsync(this WebApplication app)
     {
         using var scope = app.Services.CreateAsyncScope();
+
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<WebApplication>>();
+
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
         string[] requiredRoles = [Roles.Member, Roles.Admin];

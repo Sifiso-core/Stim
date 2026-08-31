@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Stim.Api.Migrations.Application
 {
     /// <inheritdoc />
-    public partial class ReInitMigration : Migration
+    public partial class Initialise_Application : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

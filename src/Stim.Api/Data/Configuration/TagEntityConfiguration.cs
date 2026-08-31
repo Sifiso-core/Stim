@@ -16,5 +16,9 @@ public class TagEntityConfiguration : IEntityTypeConfiguration<Tag>
             .HasMaxLength(50);
 
         builder.HasIndex(t => t.Name).IsUnique();
+
+        builder.Property(t => t.RowVersion)
+            .HasColumnName("xmin")
+            .IsRowVersion();
     }
 }

@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace Stim.Api.Models.Tag;
 
-public class UpdateTagDtoValidator : AbstractValidator<CreateTagDto>
+public class UpdateTagDtoValidator : AbstractValidator<UpdateTagDto>
 {
     public UpdateTagDtoValidator()
     {

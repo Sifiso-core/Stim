@@ -1,10 +1,11 @@
 using System.Linq.Expressions;
+using Stim.Api.Models.Commnet;
 
-namespace Stim.Api.Models.Commnet;
+namespace Stim.Api.Models.Comment;
 
 public static class CommentQueries
 {
-    public static Expression<Func<Entities.Comments, CommentDto>> ProjectToDto()
+    public static Expression<Func<Entities.Comment, CommentDto>> ProjectToDto()
     {
         return c => new CommentDto
         {

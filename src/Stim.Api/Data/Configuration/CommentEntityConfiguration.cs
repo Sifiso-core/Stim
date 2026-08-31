@@ -5,9 +5,9 @@ using Stim.Api.Entities;
 
 namespace Stim.Api.Data.Configuration;
 
-public class CommentEntityConfiguration : IEntityTypeConfiguration<Comments>
+public class CommentEntityConfiguration : IEntityTypeConfiguration<Comment>
 {
-    public void Configure(EntityTypeBuilder<Comments> builder)
+    public void Configure(EntityTypeBuilder<Comment> builder)
     {
         builder.ToTable("Comments");
 
@@ -32,5 +32,10 @@ public class CommentEntityConfiguration : IEntityTypeConfiguration<Comments>
 
         builder.HasIndex(c => c.GameId);
         builder.HasIndex(c => new { c.GameId, c.UserId });
+
+
+        builder.Property(c => c.RowVersion)
+            .HasColumnName("xmin")
+            .IsRowVersion();
     }
 }

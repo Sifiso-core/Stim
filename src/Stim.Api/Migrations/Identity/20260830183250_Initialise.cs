@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Stim.Api.Migrations.Identity
 {
     /// <inheritdoc />
-    public partial class ReInitIdentityMigration : Migration
+    public partial class Initialise : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

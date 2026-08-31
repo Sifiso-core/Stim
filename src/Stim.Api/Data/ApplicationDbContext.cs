@@ -19,5 +19,5 @@ public class ApplicationDbContext : DbContext
     public DbSet<GameTag> GameTags { get; set; }
     public DbSet<Genre> Genres { get; set; }
     public DbSet<Entities.User> Users { get; set; }
-    public DbSet<Comments> Comments { get; set; }
+    public DbSet<Comment> Comments { get; set; }
 }

@@ -7,25 +7,32 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
 using Stim.Api.Entities;
+using Stim.Api.Filters;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Concurrency;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
+using Stim.Api.Services.Representation_Context;
 using Stim.Api.Services.Sorting;
+using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
-[Authorize(Roles = Roles.Member)]
+
 [Route("games")]
 [ApiController]
 [ApiVersion(1.0)]
-public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder) : ControllerBase
+public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
 {
-    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
 
+
+    [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
     [HttpGet(Name = "GetGames")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<GameDto>))]
     public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
     {
         if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
@@ -49,7 +56,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         var links = new List<LinkDto>();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
 
@@ -59,18 +66,23 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? d =>
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? d =>
             {
                 d.Genres.ForEach(g => g.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields));
                 return hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
             }
             : null),
-            Links = IncludeHateoasLinks ? links : null
+            Links = representationContext.IncludeHateoasLinks ? links : null
         };
 
         return Ok(result);
     }
+    [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
     [HttpGet("{gameId}", Name = "GetGame")]
+    [ETagCache]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GameDto))]
     public async Task<ActionResult<GameDto>> GetGame(string gameId, [FromServices] DataShapingService dataShapingService, string? fields)
     {
         if (!dataShapingService.Validate<GameDto>(fields))
@@ -83,9 +95,12 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         {
             return NotFound();
         }
+
+        HttpContext.Items[HttpContextItemKeys.ResourceVersion] = game.RowVersion;
+
         var gameDto = game.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
 
@@ -95,6 +110,8 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateGame")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(GameDto))]
     public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createGameDto, [FromServices] IValidator<CreateGameDto> validator)
     {
         await validator.ValidateAndThrowAsync(createGameDto);
@@ -112,7 +129,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         var gameDto = game.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
         }
@@ -121,6 +138,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}", Name = "UpdateGame")]
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> UpdateGame(string gameId, [FromBody] UpdateGameDto updateGameDto, [FromServices] IValidator<UpdateGameDto> validator)
     {
 
@@ -137,6 +158,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
             return BadRequest(error: $"Game Developer With Id '{updateGameDto.DeveloperId}' does not exist");
         }
 
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, game, expectedVersion);
+
         game.UpdateGame(updateGameDto);
 
         await context.SaveChangesAsync();
@@ -145,7 +170,9 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPatch("{gameId}", Name = "PatchGame")]
-
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
     public async Task<ActionResult> PatchGame(string gameId, JsonPatchDocument<GameDto> document)
     {
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
@@ -154,6 +181,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         {
             return NotFound();
         }
+
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, game, expectedVersion);
 
         var gameDto = game.ToDto();
 
@@ -172,6 +203,8 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{gameId}", Name = "DeleteGame")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> DeleteGame(string gameId)
     {
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
@@ -181,6 +214,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
             return NotFound();
         }
 
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, game, expectedVersion);
+
         context.Games.Remove(game);
 
         await context.SaveChangesAsync();
@@ -189,6 +226,9 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}/tags", Name = "UpsertGameTags")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> UpsertGameTags(string gameId, [FromBody] UpsertGameTagDto upsertGameTagDto)
     {
         var game = await context.Games.Include(g => g.GameTags).FirstOrDefaultAsync(g => g.Id == gameId);
@@ -197,6 +237,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         {
             return NotFound();
         }
+
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, game, expectedVersion);
 
         var currentTagIds = game.GameTags.Select(gt => gt.TagId).ToHashSet();
 
@@ -223,12 +267,17 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
             CreatedAtUtc = DateTime.UtcNow
         }));
 
+        game.LastUpdatedAtUtc = DateTime.UtcNow;
+
         await context.SaveChangesAsync();
 
         return NoContent();
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPut("{gameId}/genres", Name = "UpsertGameGenres")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> UpsertGameGenres(string gameId, [FromBody] UpsertGameGenresDto upsertGameGenresDto)
     {
         var game = await context.Games.Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
@@ -237,6 +286,10 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         {
             return NotFound();
         }
+
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, game, expectedVersion);
 
         var requestedSlugs = upsertGameGenresDto.GenreSlugs.Select(s => s.ToLowerInvariant()).ToHashSet();
 
@@ -259,6 +312,8 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         var genresToAdd = targetGenres.Where(g => !currentSlugs.Contains(g.Slug.ToLowerInvariant()));
 
         game.Genres.AddRange(genresToAdd);
+
+        game.LastUpdatedAtUtc = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
 

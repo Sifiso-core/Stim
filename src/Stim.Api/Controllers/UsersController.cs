@@ -9,12 +9,16 @@ using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
-[Authorize(Roles = Roles.Admin)]
 [Route("users")]
 [ApiController]
 [ApiVersion(1.0)]
+[Authorize(Roles = Roles.Admin)]
 public class UsersController(ApplicationDbContext context, UserContext userContext) : ControllerBase
 {
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [HttpGet("{id}")]
     public async Task<ActionResult<UserDto>> GetUser(string id)
     {
@@ -41,6 +45,7 @@ public class UsersController(ApplicationDbContext context, UserContext userConte
 
     }
     [HttpGet("currentUser")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<UserDto>> GetCurrentUser()
     {
         var userId = await userContext.GetUserIdAsync();

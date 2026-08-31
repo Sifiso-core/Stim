@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Genre;
 using Stim.Api.Models.Tag;
@@ -19,5 +20,6 @@ public class GameDto
     public List<TagDto> Tags { get; set; } = [];
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public List<LinkDto>? Links { get; set; }
+
 
 }

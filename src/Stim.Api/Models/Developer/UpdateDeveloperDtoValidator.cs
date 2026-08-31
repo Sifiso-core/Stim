@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace Stim.Api.Models.Developer;
 
-public class UpdateDeveloperDtoValidator : AbstractValidator<CreateDeveloperDto>
+public class UpdateDeveloperDtoValidator : AbstractValidator<UpdateDeveloperDto>
 {
     public UpdateDeveloperDtoValidator()
     {

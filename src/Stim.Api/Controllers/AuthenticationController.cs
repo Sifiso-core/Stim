@@ -27,7 +27,9 @@ IOptions<JwtAuthOptions> options) : ControllerBase
     private readonly JwtAuthOptions options = options.Value;
 
     [HttpPost("register")]
-    public async Task<IActionResult> RegisterUser(RegisterUserDto registerUserDto)
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AccessTokenDto))]
+    public async Task<ActionResult<AccessTokenDto>> RegisterUser(RegisterUserDto registerUserDto)
     {
         using var transaction = await identityDbContext.Database.BeginTransactionAsync();
         applicationDbContext.Database.SetDbConnection(identityDbContext.Database.GetDbConnection());
@@ -84,7 +86,71 @@ IOptions<JwtAuthOptions> options) : ControllerBase
 
         return Ok(tokens);
     }
+    [HttpPost("register/admin")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AccessTokenDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+
+    public async Task<ActionResult<AccessTokenDto>> RegisterAdminUser(RegisterUserDto registerUserDto)
+    {
+        using var transaction = await identityDbContext.Database.BeginTransactionAsync();
+        applicationDbContext.Database.SetDbConnection(identityDbContext.Database.GetDbConnection());
+        await applicationDbContext.Database.UseTransactionAsync(transaction.GetDbTransaction());
+
+        var identityUser = new IdentityUser
+        {
+            Email = registerUserDto.Email,
+            UserName = registerUserDto.Email
+        };
+
+        var createUserResult = await userManager.CreateAsync(identityUser, registerUserDto.Password);
+
+        if (!createUserResult.Succeeded)
+        {
+            createUserResult.AddToModelState(ModelState);
+
+            return ValidationProblem(ModelState);
+        }
+
+        var addToRoleResult = await userManager.AddToRoleAsync(identityUser, Roles.Admin);
+
+        if (!addToRoleResult.Succeeded)
+        {
+            addToRoleResult.AddToModelState(ModelState);
+
+            return Problem("Unable To Assign Role To User");
+        }
+
+        var user = registerUserDto.ToEntity(identityUser.Id);
+
+        await applicationDbContext.Users.AddAsync(user);
+
+        await applicationDbContext.SaveChangesAsync();
+
+        TokenRequest tokenRequest = new(identityUser.Id, identityUser.Email, [Roles.Admin]);
+
+        var tokens = tokenProvider.Create(tokenRequest);
+
+
+        var refreshToken = new RefreshToken
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = identityUser.Id,
+            Token = tokens.AccessToken,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(options.RefreshTokenExpirationDays)
+        };
+
+        await identityDbContext.RefreshTokens.AddAsync(refreshToken);
+
+        await identityDbContext.SaveChangesAsync();
+
+        await transaction.CommitAsync();
+
+        return Ok(tokens);
+    }
     [HttpPost("login")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status423Locked)]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AccessTokenDto))]
     public async Task<ActionResult<AccessTokenDto>> LoginUser(LoginUserDto loginUserDto, [FromServices] SignInManager<IdentityUser> signInManager)
     {
         var identityUser = await userManager.FindByEmailAsync(loginUserDto.Email);
@@ -135,6 +201,8 @@ IOptions<JwtAuthOptions> options) : ControllerBase
         return Ok(tokens);
     }
     [HttpPost("refresh")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AccessTokenDto))]
     public async Task<ActionResult<AccessTokenDto>> Refresh([FromBody] RefreshTokenDto refreshTokenDto)
     {
         var refreshToken = await identityDbContext.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(rt => rt.Token == refreshTokenDto.RefreshToken);
@@ -159,4 +227,5 @@ IOptions<JwtAuthOptions> options) : ControllerBase
         return Ok(tokens);
 
     }
+
 }

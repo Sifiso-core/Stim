@@ -6,24 +6,31 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
 using Stim.Api.Entities;
+using Stim.Api.Filters;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.Genre;
+using Stim.Api.Services.Concurrency;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
+using Stim.Api.Services.Representation_Context;
 using Stim.Api.Services.Sorting;
+using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
-[Authorize(Roles = Roles.Member)]
 [Route("genres")]
 [ApiController]
 [ApiVersion(1.0)]
-public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder) : ControllerBase
+public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
 {
-    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
+
+    [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
     [HttpGet(Name = "GetGenres")]
-    public async Task<ActionResult<GenreDto>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<GenreDto>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<DataCollectionResponse<GenreDto>>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
         {
@@ -49,7 +56,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var links = new List<LinkDto>();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
 
@@ -59,14 +66,19 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields) : null),
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields) : null),
 
-            Links = IncludeHateoasLinks ? links : null
+            Links = representationContext.IncludeHateoasLinks ? links : null
         };
 
         return Ok(result);
     }
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet("{identifier}", Name = "GetGenreBySlugOrId")]
+    [ETagCache]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenreDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<GenreDto>> GetGenreBySlugOrId(string identifier, [FromServices] DataShapingService dataShapingService, string? fields)
     {
         if (!dataShapingService.Validate<GenreDto>(fields))
@@ -82,16 +94,21 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
             return NotFound();
         }
 
+        HttpContext.Items[HttpContextItemKeys.ResourceVersion] = genre.RowVersion;
+
         var genreDto = genre.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
         }
 
         return Ok(genreDto);
     }
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet("{slug}/games", Name = "GetGamesByGenreSlug")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<GameDto>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     public async Task<IActionResult> GetGamesByGenreSlug(string slug, GameQueryParameters queries,
     [FromServices] SortMappingProvider sortMappingProvider,
     [FromServices] DataShapingService dataShapingService,
@@ -117,14 +134,14 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var links = new List<LinkDto>();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             links.AddRange(gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
         }
 
         var result = new DataCollectionResponse<ExpandoObject>
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? d =>
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? d =>
             {
                 foreach (var genre in d.Genres)
                 {
@@ -134,13 +151,15 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
             }
             : null),
 
-            Links = IncludeHateoasLinks ? links : null
+            Links = representationContext.IncludeHateoasLinks ? links : null
         };
 
         return Ok(result);
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateGenre")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenreDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
     public async Task<ActionResult<GenreDto>> CreateGenre([FromBody] CreateGenreDto createGenreDto, [FromServices] IValidator<CreateGenreDto> validator)
     {
 
@@ -154,7 +173,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var genreDto = genre.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
         }
@@ -163,6 +182,9 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPut("{genreId}", Name = "UpdateGenre")]
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
     public async Task<ActionResult> UpdateGenre(string genreId, [FromBody] UpdateGenreDto updateGenreDto, [FromServices] IValidator<UpdateGenreDto> validator)
     {
 
@@ -174,6 +196,9 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
         {
             return NotFound();
         }
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, genre, expectedVersion);
 
         genre.UpdateGenre(updateGenreDto);
 
@@ -183,13 +208,22 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{genreId}", Name = "DeleteGenre")]
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteGenre(string genreId)
     {
         var genre = await context.Genres.FirstOrDefaultAsync(g => g.Id == genreId);
+
         if (genre is null)
         {
             return NotFound();
         }
+
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, genre, expectedVersion);
+
         context.Genres.Remove(genre);
 
         await context.SaveChangesAsync();

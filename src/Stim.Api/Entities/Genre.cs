@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Genre
+public class Genre : IVersionedEntity
 {
     public required string Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -9,4 +9,6 @@ public class Genre
     public DateTime CreatedAtUtc { get; set; }
     public DateTime LastUpdatedAtUtc { get; set; }
     public string Slug { get; set; } = string.Empty;
+
+    public uint RowVersion { get; set; }
 }

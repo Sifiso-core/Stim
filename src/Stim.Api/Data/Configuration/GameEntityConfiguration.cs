@@ -27,5 +27,9 @@ public class GameEntityConfiguration : IEntityTypeConfiguration<Game>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(g => g.Tags).WithMany().UsingEntity<GameTag>();
+
+        builder.Property(g => g.RowVersion)
+            .HasColumnName("xmin")
+            .IsRowVersion();
     }
 }

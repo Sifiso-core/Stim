@@ -12,8 +12,8 @@ using Stim.Api.Data;
 namespace Stim.Api.Migrations.Application
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260828163713_Re-Init-Migration")]
-    partial class ReInitMigration
+    [Migration("20260830183319_Initialise_Application")]
+    partial class Initialise_Application
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -78,7 +78,7 @@ namespace Stim.Api.Migrations.Application
                     b.ToTable("IdentityUser", "stim");
                 });
 
-            modelBuilder.Entity("Stim.Api.Entities.Comments", b =>
+            modelBuilder.Entity("Stim.Api.Entities.Comment", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(300)
@@ -95,6 +95,12 @@ namespace Stim.Api.Migrations.Application
                     b.Property<string>("GameId")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -127,6 +133,12 @@ namespace Stim.Api.Migrations.Application
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<string>("WebsiteUrl")
                         .HasColumnType("text");
@@ -161,6 +173,12 @@ namespace Stim.Api.Migrations.Application
 
                     b.Property<DateTime>("ReleaseDateUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -216,6 +234,12 @@ namespace Stim.Api.Migrations.Application
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -283,6 +307,12 @@ namespace Stim.Api.Migrations.Application
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
@@ -331,7 +361,7 @@ namespace Stim.Api.Migrations.Application
                     b.ToTable("Users", "stim");
                 });
 
-            modelBuilder.Entity("Stim.Api.Entities.Comments", b =>
+            modelBuilder.Entity("Stim.Api.Entities.Comment", b =>
                 {
                     b.HasOne("Stim.Api.Entities.Game", null)
                         .WithMany()

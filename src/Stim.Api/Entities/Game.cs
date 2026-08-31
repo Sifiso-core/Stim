@@ -3,7 +3,7 @@ using System;
 namespace Stim.Api.Entities;
 
 
-public class Game
+public class Game : IVersionedEntity
 {
     public required string Id { get; set; }
     public required string Title { get; set; }
@@ -16,5 +16,6 @@ public class Game
     public List<Genre> Genres { get; set; } = [];
     public List<GameTag> GameTags { get; set; } = [];
     public List<Tag> Tags { get; set; } = [];
+    public uint RowVersion { get; set; }
 
 }

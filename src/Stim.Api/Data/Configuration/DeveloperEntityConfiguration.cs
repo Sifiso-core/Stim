@@ -17,5 +17,9 @@ public class DeveloperEntityConfiguration : IEntityTypeConfiguration<Developer>
 
         builder.Property(d => d.Description)
             .HasMaxLength(1000);
+
+        builder.Property(d => d.RowVersion)
+            .HasColumnName("xmin")
+            .IsRowVersion();
     }
 }

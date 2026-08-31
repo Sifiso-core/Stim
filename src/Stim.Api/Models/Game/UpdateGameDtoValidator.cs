@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace Stim.Api.Models.Game;
 
-public class UpdateGameDtoValidator : AbstractValidator<CreateGameDto>
+public class UpdateGameDtoValidator : AbstractValidator<UpdateGameDto>
 {
     public UpdateGameDtoValidator()
     {

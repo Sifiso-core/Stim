@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 
 namespace Stim.Api.Models.Commnet;
@@ -15,5 +16,4 @@ public class CommentDto()
     public DateTime? UpdatedAtUtc { get; set; }
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public List<LinkDto>? Links { get; set; }
-
 };

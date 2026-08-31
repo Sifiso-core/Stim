@@ -20,5 +20,9 @@ public class GenreEntityConfiguration : IEntityTypeConfiguration<Genre>
             .HasMaxLength(50);
 
         builder.HasIndex(g => g.Slug).IsUnique();
+
+        builder.Property(g => g.RowVersion)
+            .HasColumnName("xmin")
+            .IsRowVersion();
     }
 }

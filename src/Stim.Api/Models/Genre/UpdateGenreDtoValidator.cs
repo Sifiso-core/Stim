@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace Stim.Api.Models.Genre;
 
-public class UpdateGenreDtoValidator : AbstractValidator<CreateGenreDto>
+public class UpdateGenreDtoValidator : AbstractValidator<UpdateGenreDto>
 {
     public UpdateGenreDtoValidator()
     {

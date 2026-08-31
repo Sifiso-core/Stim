@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Stim.Api.Entities;
 using Stim.Api.Models.Common;
 
 namespace Stim.Api.Models.Genre;
@@ -12,5 +13,4 @@ public class GenreDto
     public string Slug { get; set; } = string.Empty;
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public List<LinkDto>? Links { get; set; }
-
 }

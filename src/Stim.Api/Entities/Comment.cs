@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Comments
+public class Comment : IVersionedEntity
 {
     public string Id { get; set; } = string.Empty;
     public required string CommentText { get; set; }
@@ -9,4 +9,6 @@ public class Comments
     public required string GameId { get; set; }
     public required string UserId { get; set; }
     public User User { get; set; } = null!;
+
+    public uint RowVersion { get; set; }
 }

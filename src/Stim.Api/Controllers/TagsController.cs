@@ -6,23 +6,28 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stim.Api.Data;
 using Stim.Api.Entities;
+using Stim.Api.Filters;
 using Stim.Api.Models.Common;
 using Stim.Api.Models.Tag;
+using Stim.Api.Services.Concurrency;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
+using Stim.Api.Services.Representation_Context;
 using Stim.Api.Services.Sorting;
+using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
-[Authorize(Roles = Roles.Member)]
 [Route("tags")]
 [ApiController]
 [ApiVersion(1.0)]
-public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<TagDto, TagQueryParameters> hateoasLinkBuilder) : ControllerBase
+public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<TagDto, TagQueryParameters> hateoasLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
 {
-    private bool IncludeHateoasLinks => Request.Headers.Accept.Contains(CustomMediaTypeNames.Application.HateoasJsonMediaType);
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet(Name = "GetTags")]
-    public async Task<IActionResult> GetTags(TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    [ProducesResponseType(StatusCodes.Status204NoContent, Type = typeof(DataCollectionResponse<TagDto>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
+    public async Task<ActionResult<DataCollectionResponse<TagDto>>> GetTags(TagQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
     {
         if (!sortMappingProvider.ValidateMappings<TagDto, Tag>(queries.Sort))
         {
@@ -46,14 +51,19 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         var result = new DataCollectionResponse<ExpandoObject>()
         {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, IncludeHateoasLinks ? t => hateoasLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields) : null),
+            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? t => hateoasLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields) : null),
 
-            Links = IncludeHateoasLinks ? hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage) : null
+            Links = representationContext.IncludeHateoasLinks ? hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage) : null
         };
 
         return Ok(result);
     }
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet("{tagId}", Name = "GetTag")]
+    [ETagCache]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ValidationProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TagDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Description = "Tag With Provided Id Could Not Be Found")]
     public async Task<ActionResult<TagDto>> GetTag(string tagId, [FromServices] DataShapingService dataShapingService, string? fields)
     {
         if (!dataShapingService.Validate<TagDto>(fields))
@@ -66,9 +76,12 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
         {
             return NotFound();
         }
+
+        HttpContext.Items[HttpContextItemKeys.ResourceVersion] = tag.RowVersion;
+
         var tagDto = tag.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, fields);
         }
@@ -77,6 +90,8 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateTag")]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(TagDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<TagDto>> CreateTag([FromBody] CreateTagDto createTagDto, [FromServices] IValidator<CreateTagDto> validator)
     {
         await validator.ValidateAndThrowAsync(createTagDto);
@@ -94,7 +109,7 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
 
         var tagDto = tag.ToDto();
 
-        if (IncludeHateoasLinks)
+        if (representationContext.IncludeHateoasLinks)
         {
             tagDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, tagDto.Id, null);
         }
@@ -103,6 +118,8 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPut("{tagId}", Name = "UpdateTag")]
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> UpdateTag(string tagId, [FromBody] UpdateTagDto updateTagDto, [FromServices] IValidator<UpdateTagDto> validator)
     {
 
@@ -115,6 +132,10 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
             return NotFound();
         }
 
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, tag, expectedVersion);
+
         tag.UpdateTag(updateTagDto);
 
         await context.SaveChangesAsync();
@@ -123,6 +144,10 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpDelete("{tagId}", Name = "DeleteTag")]
+    [RequireIfMatch]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+
     public async Task<ActionResult> DeleteTag(string tagId)
     {
         var tag = await context.Tags.FirstOrDefaultAsync(t => t.Id == tagId);
@@ -131,6 +156,10 @@ public class TagsController(ApplicationDbContext context, IHateoasLinkBuilder<Ta
         {
             return NotFound();
         }
+
+        var expectedVersion = concurrencyService.GetExpectedVersion(HttpContext);
+
+        concurrencyService.SetOriginalVersion(context, tag, expectedVersion);
 
         context.Tags.Remove(tag);
 

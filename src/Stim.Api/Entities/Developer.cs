@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Developer
+public class Developer : IVersionedEntity
 {
     public required string Id { get; set; }
     public required string Name { get; set; }
@@ -8,4 +8,5 @@ public class Developer
     public string? WebsiteUrl { get; set; }
     public List<Game> Games { get; set; } = [];
 
+    public uint RowVersion { get; set; }
 }

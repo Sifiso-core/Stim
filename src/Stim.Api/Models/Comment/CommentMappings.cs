@@ -2,9 +2,9 @@ namespace Stim.Api.Models.Commnet;
 
 public static class CommentMappings
 {
-    public static Entities.Comments ToEntity(this CreateCommentDto createCommentDto, string gameId, string userId)
+    public static Entities.Comment ToEntity(this CreateCommentDto createCommentDto, string gameId, string userId)
     {
-        return new Entities.Comments()
+        return new Entities.Comment()
         {
             GameId = gameId,
             UserId = userId,
@@ -13,7 +13,7 @@ public static class CommentMappings
             Id = $"c_{Guid.CreateVersion7()}",
         };
     }
-    public static CommentDto ToDto(this Entities.Comments comment, string authorName)
+    public static CommentDto ToDto(this Entities.Comment comment, string authorName)
     {
         return new CommentDto()
         {
@@ -26,7 +26,7 @@ public static class CommentMappings
             UserId = comment.UserId
         };
     }
-    public static void UpdateComment(this Entities.Comments comment, string commentText)
+    public static void UpdateComment(this Entities.Comment comment, string commentText)
     {
         comment.CommentText = commentText;
         comment.UpdatedAtUtc = DateTime.UtcNow;
