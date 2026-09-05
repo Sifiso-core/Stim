@@ -20,6 +20,9 @@ public static class TagMappings
             Description = dto.Description,
         };
     }
+    public static List<TagDto> ToDto(this IEnumerable<Entities.Tag> tags) => [
+        ..tags.Select(t => t.ToDto())
+    ];
     public static TagDto ToDto(this Entities.Tag tag)
     {
         return new TagDto()

@@ -7,4 +7,6 @@ public class DataCollectionResponse<T>
     public required List<T> Data { get; set; }
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public List<LinkDto>? Links { get; set; }
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public PaginationMetadata Pagination { get; set; } = null!;
 }

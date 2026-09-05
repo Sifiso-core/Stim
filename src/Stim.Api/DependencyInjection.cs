@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Stim.Api.Data;
 using Stim.Api.Entities;
@@ -46,6 +47,8 @@ public static class DependencyInjection
         }).AddNewtonsoftJson(options =>
         {
             options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+            options.SerializerSettings.Converters.Add(
+            new StringEnumConverter());
         });
 
         builder.Services.Configure<MvcOptions>(options =>

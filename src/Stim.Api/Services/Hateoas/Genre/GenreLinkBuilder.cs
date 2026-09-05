@@ -6,6 +6,23 @@ namespace Stim.Api.Services.Hateoas.Genre;
 
 public class GenreLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder<GenreDto, GenreQueryParameters>
 {
+    public List<LinkDto> CreateCursorCollectionLinks(HttpContext httpContext, GenreQueryParameters queryParameters, string? nextCursor, string? previousCursor)
+    {
+        var links = new List<LinkDto>
+        {
+            CreateLink(httpContext, nameof(GenresController.GetGenres), IanaLinkRelations.Self, HttpMethods.Get, queryParameters)
+        };
+        if (nextCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(GenresController.GetGenres), IanaLinkRelations.Next, HttpMethods.Get, queryParameters with { Page = null, Cursor = nextCursor }));
+        }
+        if (previousCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(GenresController.GetGenres), IanaLinkRelations.Prev, HttpMethods.Get, queryParameters with { Page = null, Cursor = previousCursor }));
+        }
+        return links;
+    }
+
     public List<LinkDto> CreateLinksForCollection(HttpContext httpContext, GenreQueryParameters queryParameters, bool hasNext, bool hasPrevious)
     {
         var links = new List<LinkDto>
@@ -31,7 +48,7 @@ public class GenreLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder
         CreateLink(httpContext, nameof(GenresController.GetGenreBySlugOrId), IanaLinkRelations.Self, HttpMethods.Get, new { identifier = id, fields }),
         CreateLink(httpContext, nameof(GenresController.UpdateGenre), IanaLinkRelations.Update, HttpMethods.Put, new { genreId = id }),
         CreateLink(httpContext, nameof(GenresController.DeleteGenre), IanaLinkRelations.Delete, HttpMethods.Delete, new { genreId = id }),
-        CreateLink(httpContext, nameof(GenresController.GetGamesByGenreSlug), "games", HttpMethods.Get, new { slug = id })
+      //ss  CreateLink(httpContext, nameof(GenresController.GetGamesByGenreSlug), "games", HttpMethods.Get, new { slug = id })
     ];
 
     private LinkDto CreateLink(HttpContext httpContext, string routeName, string rel, string method, object? values = null)

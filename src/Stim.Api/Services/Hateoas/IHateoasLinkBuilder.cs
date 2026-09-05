@@ -6,4 +6,5 @@ public interface IHateoasLinkBuilder<TDto, TQueryParameters>
 {
     List<LinkDto> CreateLinksForResource(HttpContext httpContext, string id, string? fields);
     List<LinkDto> CreateLinksForCollection(HttpContext httpContext, TQueryParameters queryParameters, bool hasNext, bool hasPrevious);
+    List<LinkDto> CreateCursorCollectionLinks(HttpContext httpContext, TQueryParameters queryParameters, string? nextCursor, string? previousCursor);
 }

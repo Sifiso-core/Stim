@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Developer : IVersionedEntity
+public class Developer : IVersionedEntity, ICursorPaginatedEntity
 {
     public required string Id { get; set; }
     public required string Name { get; set; }
@@ -9,4 +9,5 @@ public class Developer : IVersionedEntity
     public List<Game> Games { get; set; } = [];
 
     public uint RowVersion { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 }

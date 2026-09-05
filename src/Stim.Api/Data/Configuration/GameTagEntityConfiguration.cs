@@ -11,13 +11,13 @@ public class GameTagEntityConfiguration : IEntityTypeConfiguration<GameTag>
     {
         builder.HasKey(gt => new { gt.GameId, gt.TagId });
 
-        builder.HasOne<Game>()
+        builder.HasOne(gt => gt.Game)
             .WithMany(g => g.GameTags)
-            .HasForeignKey(gt => gt.GameId);
+            .HasForeignKey(gt => gt.GameId).OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne<Tag>()
+        builder.HasOne(gt => gt.Tag)
             .WithMany()
-            .HasForeignKey(gt => gt.TagId);
+            .HasForeignKey(gt => gt.TagId).OnDelete(DeleteBehavior.Cascade);
 
     }
 }

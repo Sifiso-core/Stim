@@ -24,17 +24,62 @@ public class DeveloperLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBui
 
         if (hasNext)
         {
-            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers), IanaLinkRelations.Next, HttpMethods.Get, developerQueryParameters with { Page = developerQueryParameters.Page + 1 }));
+            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers),
+            IanaLinkRelations.Next,
+            HttpMethods.Get,
+            developerQueryParameters with { Page = developerQueryParameters.Page + 1 }));
         }
 
         if (hasPrevious)
         {
-            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers), IanaLinkRelations.Prev, HttpMethods.Get, developerQueryParameters with { Page = developerQueryParameters.Page - 1 }));
+            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers),
+            IanaLinkRelations.Prev,
+            HttpMethods.Get,
+            developerQueryParameters with { Page = developerQueryParameters.Page - 1 }));
         }
 
         return links;
     }
 
+    public List<LinkDto> CreateCursorCollectionLinks(
+    HttpContext httpContext,
+    DeveloperQueryParameters queries,
+    string? nextCursor,
+    string? previousCursor)
+    {
+        var links = new List<LinkDto>
+        {
+            CreateLink(httpContext,nameof(DevelopersController.GetDevelopers),IanaLinkRelations.Self,HttpMethods.Get,queries),
+
+            CreateLink(httpContext,nameof(DevelopersController.CreateDeveloper),IanaLinkRelations.Create,HttpMethods.Post)
+        };
+
+        if (!string.IsNullOrWhiteSpace(nextCursor))
+        {
+            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers),
+            IanaLinkRelations.Next,
+            HttpMethods.Get,
+            queries with
+            {
+                Cursor = nextCursor,
+                Page = null
+            }));
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousCursor))
+        {
+            links.Add(CreateLink(httpContext, nameof(DevelopersController.GetDevelopers),
+            IanaLinkRelations.Prev,
+            HttpMethods.Get,
+            queries with
+            {
+                Cursor = previousCursor,
+                Page = null
+            }));
+        }
+
+        return links;
+    }
     private LinkDto CreateLink(HttpContext httpContext, string routeName, string rel, string method, object? values = null)
     {
         var href = linkGenerator.GetUriByRouteValues(httpContext, routeName, values);

@@ -12,8 +12,8 @@ using Stim.Api.Data;
 namespace Stim.Api.Migrations.Identity
 {
     [DbContext(typeof(ApplicationIdentityDbContext))]
-    [Migration("20260830183250_Initialise")]
-    partial class Initialise
+    [Migration("20260905205043_identity_init")]
+    partial class identity_init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

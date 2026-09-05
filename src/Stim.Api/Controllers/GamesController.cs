@@ -12,12 +12,12 @@ using Stim.Api.Models.Common;
 using Stim.Api.Models.Game;
 using Stim.Api.Models.GameTag;
 using Stim.Api.Models.Genre;
+using Stim.Api.Models.Tag;
 using Stim.Api.Services.Concurrency;
 using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Representation_Context;
 using Stim.Api.Services.Sorting;
-using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
@@ -25,7 +25,7 @@ namespace Stim.Api.Controllers;
 [Route("games")]
 [ApiController]
 [ApiVersion(1.0)]
-public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> hateoasLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
+public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
 {
 
 
@@ -33,53 +33,47 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     [HttpGet(Name = "GetGames")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<GameDto>))]
-    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
+    public async Task<ActionResult<DataCollectionResponse<GameDto>>> GetGames([FromQuery] GameQueryParameters queries,
+    [FromServices] SortMappingProvider sortMappingProvider,
+    [FromServices] DataShapingService dataShapingService,
+    [FromServices] IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder,
+    [FromServices] IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder,
+      CancellationToken cancellationToken)
     {
-        if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
+        var validationResult = ValidateQueryParameters(queries, sortMappingProvider, dataShapingService);
+
+        if (validationResult is not null) { return validationResult; }
+
+        var gamesQuery = BuildGameQuery(queries, sortMappingProvider);
+
+        var pageSize = queries.PageSize ?? GameQueryParameters.GamesQueryDefaults.PageSize; DataCollectionResponse<GameDto> paginationResult;
+
+        if (queries.PaginationType == PaginationType.Cursor)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
-        }
-        if (!dataShapingService.Validate<GameDto>(queries.Fields))
-        {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
-        }
-        var sortMappings = sortMappingProvider.GetMappings<GameDto, Game>();
-
-        var search = queries.Search?.Trim().ToLower();
-
-        var gamesQueryable = context.Games.Include(g => g.Tags)
-        .Where(g => search == null || g.Title.ToLower().Contains(search) || g.Description != null && g.Description.ToLower().Contains(search))
-        .ApplySort(queries.Sort, sortMappings)
-        .Select(GameQueries.ProjectToGameDto());
-
-        var paginationResult = await gamesQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
-
-        var links = new List<LinkDto>();
-
-        if (representationContext.IncludeHateoasLinks)
-        {
-            links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
-
-            paginationResult.Links = links;
-
-        }
-
-        var result = new DataCollectionResponse<ExpandoObject>()
-        {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? d =>
+            var result = await gamesQuery.ToCursorPaginationResult(queries.Cursor, pageSize, cancellationToken);
+            paginationResult = new()
             {
-                d.Genres.ForEach(g => g.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields));
-                return hateoasLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
-            }
-            : null),
-            Links = representationContext.IncludeHateoasLinks ? links : null
-        };
+                Data = result.Data.ToDto(),
+                Links = result.Links,
+                Pagination = result.Pagination
+            };
+        }
+        else
+        {
+            var page = queries.Page ?? GameQueryParameters.GamesQueryDefaults.Page; var result = await gamesQuery.ToPaginationResultAsync(page, pageSize, cancellationToken);
+            queries = queries with { Page = page }; paginationResult = new() { Data = result.Data.ToDto(), Links = result.Links, Pagination = result.Pagination };
+        }
 
-        return Ok(result);
+        AddHateoasLinks(paginationResult, queries, gameLinkBuilder, genreLinkBuilder, tagLinkBuilder);
+
+        var shapedData = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields);
+
+        var response = new DataCollectionResponse<ExpandoObject> { Data = [.. shapedData], Pagination = paginationResult.Pagination, Links = paginationResult.Links };
+        return Ok(response);
     }
     [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
     [HttpGet("{gameId}", Name = "GetGame")]
-    [ETagCache]
+    [ETagConcurrencyFilterAttribute]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GameDto))]
@@ -89,7 +83,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {fields}");
         }
-        var game = await context.Games.Include(g => g.GameTags).Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await context.Games.Include(g => g.GameTags).ThenInclude(t => t.Tag).Include(g => g.GameGenres).ThenInclude(g => g.Genre).FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game is null)
         {
@@ -102,7 +96,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         if (representationContext.IncludeHateoasLinks)
         {
-            gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
+            gameDto.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, gameDto.Id, fields);
 
         }
 
@@ -131,7 +125,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         if (representationContext.IncludeHateoasLinks)
         {
-            gameDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
+            gameDto.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, game.Id, null);
         }
 
         return CreatedAtRoute("GetGame", new { gameId = game.Id }, gameDto);
@@ -205,6 +199,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     [HttpDelete("{gameId}", Name = "DeleteGame")]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [RequireIfMatch]
     public async Task<ActionResult> DeleteGame(string gameId)
     {
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);
@@ -229,6 +224,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireIfMatch]
     public async Task<ActionResult> UpsertGameTags(string gameId, [FromBody] UpsertGameTagDto upsertGameTagDto)
     {
         var game = await context.Games.Include(g => g.GameTags).FirstOrDefaultAsync(g => g.Id == gameId);
@@ -253,7 +249,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         if (existingTags.Count != upsertGameTagDto.TagIds.Count)
         {
-            return BadRequest("One Or More Tags Ids Are Invalid");
+            return Problem("One Or More Tags Ids Are Invalid", statusCode: StatusCodes.Status400BadRequest);
         }
 
         game.GameTags.RemoveAll(t => !upsertGameTagDto.TagIds.Contains(t.TagId));
@@ -278,6 +274,7 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireIfMatch]
     public async Task<ActionResult> UpsertGameGenres(string gameId, [FromBody] UpsertGameGenresDto upsertGameGenresDto)
     {
         var game = await context.Games.Include(g => g.Genres).FirstOrDefaultAsync(g => g.Id == gameId);
@@ -304,19 +301,140 @@ public class GamesController(ApplicationDbContext context, IHateoasLinkBuilder<G
 
         if (targetGenres.Count != requestedSlugs.Count)
         {
-            return BadRequest("One or more genre slugs are invalid");
+            return Problem("One or more genre slugs are invalid", statusCode: StatusCodes.Status400BadRequest);
         }
 
         game.Genres.RemoveAll(g => !requestedSlugs.Contains(g.Slug.ToLowerInvariant()));
 
-        var genresToAdd = targetGenres.Where(g => !currentSlugs.Contains(g.Slug.ToLowerInvariant()));
+        var currentGenreIds = game.GameGenres.Select(x => x.GenreId).ToHashSet();
 
-        game.Genres.AddRange(genresToAdd);
+        var genresToRemove = game.GameGenres.Where(x => !requestedSlugs.Contains(x.Genre.Slug.ToLowerInvariant())).ToList();
+
+        foreach (var gameGenre in genresToRemove)
+        {
+            game.GameGenres.Remove(gameGenre);
+        }
+
+        var genresToAdd = targetGenres
+            .Where(g => !currentGenreIds.Contains(g.Id))
+            .Select(g => new GameGenre
+            {
+                GameId = game.Id,
+                GenreId = g.Id,
+                Genre = g,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+        game.GameGenres.AddRange(genresToAdd);
 
         game.LastUpdatedAtUtc = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
 
         return NoContent();
+    }
+    private IQueryable<Game> BuildGameQuery(GameQueryParameters queries, SortMappingProvider sortMappingProvider)
+    {
+        var search = queries.Search?.Trim().ToLower();
+
+        var sortMappings = sortMappingProvider.GetMappings<GameDto, Game>();
+
+        return context.Games.Include(g => g.GameGenres).ThenInclude(g => g.Genre).Include(g => g.GameTags).ThenInclude(gt => gt.Tag).Where(game => search == null || game.Title.ToLower().Contains(search))
+            .ApplySort(queries.Sort, sortMappings);
+    }
+
+    private ObjectResult? ValidateQueryParameters(
+        GameQueryParameters queries,
+        SortMappingProvider sortMappingProvider,
+        DataShapingService dataShapingService)
+    {
+        if (queries.Page is not null && queries.Cursor is not null)
+        {
+            return Problem("The 'page' and 'cursor' query parameters cannot be used together.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.Page is not null && queries.Page < 1)
+        {
+            return Problem("The 'page' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PageSize is not null && queries.PageSize < 1)
+        {
+            return Problem("The 'pageSize' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!sortMappingProvider.ValidateMappings<GameDto, Game>(queries.Sort))
+        {
+            return Problem($"The supplied sort parameter is invalid: '{queries.Sort}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!dataShapingService.Validate<GameDto>(queries.Fields))
+        {
+            return Problem($"The supplied fields parameter is invalid: '{queries.Fields}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PaginationType == PaginationType.Cursor && !string.IsNullOrWhiteSpace(queries.Sort))
+        {
+            return Problem("Custom sorting is not supported with cursor pagination. " + "Cursor pagination uses CreatedAtUtc descending and Id ascending.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PaginationType == PaginationType.Cursor && queries.Page is not null)
+        {
+            return Problem("'page' cannot be used with cursor pagination.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PaginationType == PaginationType.Offset && !string.IsNullOrWhiteSpace(queries.Cursor))
+        {
+            return Problem("'Cursor' cannot be used with offset pagination. " + "Review your parameters.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return null;
+    }
+    private void AddHateoasLinks(
+        DataCollectionResponse<GameDto> response,
+        GameQueryParameters queries,
+        IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+        IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder,
+        IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder)
+    {
+        if (!representationContext.IncludeHateoasLinks)
+        {
+            return;
+        }
+
+        foreach (var game in response.Data)
+        {
+            AddGameLinks(game, queries, gameLinkBuilder, genreLinkBuilder, tagLinkBuilder);
+        }
+
+        if (response.Pagination?.PaginationType == PaginationType.Cursor)
+        {
+            response.Links = gameLinkBuilder.CreateCursorCollectionLinks(HttpContext, queries, response.Pagination.NextCursor, response.Pagination.PreviousCursor);
+
+            return;
+        }
+
+        response.Links = gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, response.Pagination?.HasNextPage ?? false, response.Pagination?.HasPreviousPage ?? false);
+    }
+
+    private void AddGameLinks(
+        GameDto game,
+        GameQueryParameters queries,
+        IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+        IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder,
+        IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder)
+    {
+        game.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, game.Id, queries.Fields);
+
+
+        foreach (var genre in game.Genres)
+        {
+            genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
+        }
+
+        foreach (var tag in game.Tags)
+        {
+            tag.Links = tagLinkBuilder.CreateLinksForResource(HttpContext, tag.Id, queries.Fields);
+        }
     }
 }

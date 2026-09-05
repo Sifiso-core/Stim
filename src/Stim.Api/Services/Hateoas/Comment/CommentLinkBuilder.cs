@@ -6,6 +6,11 @@ namespace Stim.Api.Services.Hateoas.Comment;
 
 public class CommentLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder<CommentDto, CommentQueryParameters>
 {
+    public List<LinkDto> CreateCursorCollectionLinks(HttpContext httpContext, CommentQueryParameters queryParameters, string? nextCursor, string? previousCursor)
+    {
+        throw new NotImplementedException();
+    }
+
     public List<LinkDto> CreateLinksForCollection(HttpContext httpContext, CommentQueryParameters queryParameters, bool hasNext, bool hasPrevious)
     {
         var gameId = httpContext.GetRouteValue("gameId")?.ToString();

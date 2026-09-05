@@ -12,6 +12,9 @@ public static class GenreMappings
             new(nameof(GenreDto.Slug),nameof(Entities.Genre.Slug))
         ]
     };
+    public static List<GenreDto> ToDto(this IEnumerable<Entities.Genre> genres) => [
+        .. genres.Select(g => g.ToDto())
+    ];
     public static GenreDto ToDto(this Entities.Genre genre)
     {
         return new GenreDto()

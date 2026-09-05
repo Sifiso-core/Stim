@@ -6,6 +6,22 @@ namespace Stim.Api.Services.Hateoas.Game;
 
 public class GameLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder<GameDto, GameQueryParameters>
 {
+    public List<LinkDto> CreateCursorCollectionLinks(HttpContext httpContext, GameQueryParameters queryParameters, string? nextCursor, string? previousCursor)
+    {
+        var links = new List<LinkDto>
+        {
+            CreateLink(httpContext, nameof(GamesController.GetGames), IanaLinkRelations.Self, HttpMethods.Get, queryParameters)
+        };
+        if (nextCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(GamesController.GetGames), IanaLinkRelations.Next, HttpMethods.Get, queryParameters with { Page = null, Cursor = nextCursor }));
+        }
+        if (previousCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(GamesController.GetGames), IanaLinkRelations.Prev, HttpMethods.Get, queryParameters with { Page = null, Cursor = previousCursor }));
+        }
+        return links;
+    }
     public List<LinkDto> CreateLinksForCollection(HttpContext httpContext, GameQueryParameters gameQueryParameters, bool hasNext, bool hasPrevious)
     {
         var links = new List<LinkDto>

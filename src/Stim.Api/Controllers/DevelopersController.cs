@@ -34,68 +34,82 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<DeveloperDto>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails), Description = "BadRequest: Ambiguous Api Version, Use One Versioned Media Type In Your 'Accept Header'")]
-    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers([FromQuery] DeveloperQueryParameters queries,
-     SortMappingProvider sortMappingProvider,
-     DataShapingService dataShapingService,
-    [FromServices] IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
-    [FromServices] IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder,
-    [FromServices] IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder
-  )
+    public async Task<ActionResult<DataCollectionResponse<DeveloperDto>>> GetDevelopers(
+    [FromQuery] DeveloperQueryParameters queries,
+    SortMappingProvider sortMappingProvider,
+    DataShapingService dataShapingService,
+    [FromServices]
+    IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+    [FromServices]
+    IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder,
+    [FromServices]
+    IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder,
+    CancellationToken cancellationToken)
     {
-        if (!sortMappingProvider.ValidateMappings<DeveloperDto, Developer>(queries.Sort))
+        var validationResult = ValidateQueryParameters(queries, sortMappingProvider, dataShapingService);
+
+        if (validationResult is not null)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
-        }
-        if (!dataShapingService.Validate<DeveloperDto>(queries.Fields))
-        {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
+            return validationResult;
         }
 
-        var sortMappings = sortMappingProvider.GetMappings<DeveloperDto, Developer>();
+        var developersQuery = BuildDeveloperQuery(queries, sortMappingProvider);
 
-        var search = queries.Search?.Trim().ToLower();
+        var pageSize = queries.PageSize ?? DeveloperQueryParameters.DeveloperQueryDefaults.PageSize;
 
-        var developersQueryable = context.Developers.Where(d => search == null || d.Name.ToLower().Contains(search))
-                                                                    .ApplySort(queries.Sort, sortMappings)
-                                                                    .Select(DeveloperQueries.ProjectToDto());
+        DataCollectionResponse<DeveloperDto> paginationResult;
 
-
-        var paginationResult = await developersQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
-
-        List<LinkDto> links = [];
-
-        if (representationContext.IncludeHateoasLinks)
+        if (queries.PaginationType == PaginationType.Cursor)
         {
-            links.AddRange(developerLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
-            paginationResult.Links = links;
-        }
+            var result = await developersQuery.ToCursorPaginationResult(queries.Cursor, pageSize, cancellationToken);
 
-        var response = new DataCollectionResponse<ExpandoObject>()
-        {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? d =>
-        {
-            foreach (var game in d.Games)
+            paginationResult = new()
             {
-                game.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, game.Id, queries.Fields);
+                Data = result.Data.ToDto(),
+                Links = result.Links,
+                Pagination = result.Pagination
+            };
 
-                game.Tags.ForEach(t => t.Links = tagLinkBuilder.CreateLinksForResource(HttpContext, t.Id, queries.Fields));
-
-                game.Genres.ForEach(g => g.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields));
-            }
-
-            return developerLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
         }
-            : null),
+        else
+        {
+            var page = queries.Page ?? DeveloperQueryParameters.DeveloperQueryDefaults.Page;
 
-            Links = representationContext.IncludeHateoasLinks ? links : null
+            var result = await developersQuery.ToPaginationResultAsync(page, pageSize, cancellationToken);
 
+            queries = queries with
+            {
+                Page = page
+            };
+
+            paginationResult = new()
+            {
+                Data = result.Data.ToDto(),
+                Links = result.Links,
+                Pagination = result.Pagination
+            };
+
+        }
+
+        AddHateoasLinks(paginationResult, queries, gameLinkBuilder, tagLinkBuilder, genreLinkBuilder);
+
+        var shapedData = dataShapingService.ShapeCollectionData(
+            paginationResult.Data,
+            queries.Fields);
+
+        var response = new DataCollectionResponse<ExpandoObject>
+        {
+            Data = [.. shapedData],
+            Pagination = paginationResult.Pagination,
+            Links = paginationResult.Links
         };
 
         return Ok(response);
     }
+
     [HttpGet("{developerId}", Name = "GetDeveloper")]
     [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
-    [ETagCache]
+    [ETagConcurrencyFilterAttribute]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeveloperDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
@@ -271,4 +285,109 @@ public class DevelopersController(ApplicationDbContext context, IHateoasLinkBuil
 
         return Ok(developerDtos);
     }
+    private ObjectResult? ValidateQueryParameters(DeveloperQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    {
+        if (queries.Page is not null && queries.Cursor is not null)
+        {
+            return Problem("The 'page' and 'cursor' query parameters cannot be used together.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.Page is not null && queries.Page < 1)
+        {
+            return Problem("The 'page' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PageSize is not null && queries.PageSize < 1)
+        {
+            return Problem("The 'pageSize' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!sortMappingProvider.ValidateMappings<DeveloperDto, Developer>(queries.Sort))
+        {
+            return Problem($"The supplied sort parameter is invalid: '{queries.Sort}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!dataShapingService.Validate<DeveloperDto>(queries.Fields))
+        {
+            return Problem($"The supplied fields parameter is invalid: '{queries.Fields}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        if (queries.PaginationType == PaginationType.Cursor && !string.IsNullOrWhiteSpace(queries.Sort))
+        {
+            return Problem("Custom sorting is not supported with cursor pagination. " + "Cursor pagination uses CreatedAtUtc descending and Id ascending.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        if (queries.PaginationType == PaginationType.Cursor && queries.Page is not null)
+        {
+            return Problem("'page' cannot be used with cursor pagination.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PaginationType == PaginationType.Offset && !string.IsNullOrWhiteSpace(queries.Cursor))
+        {
+            return Problem("'Cursor' cannot be used with offset pagination. Review your parameters", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return null;
+    }
+    private IQueryable<Developer> BuildDeveloperQuery(
+    DeveloperQueryParameters queries,
+    SortMappingProvider sortMappingProvider)
+    {
+        var search = queries.Search?.Trim().ToLower();
+
+        var sortMappings = sortMappingProvider.GetMappings<DeveloperDto, Developer>();
+
+        return context.Developers.Include(d => d.Games).Where(developer => search == null || developer.Name.ToLower().Contains(search)).ApplySort(queries.Sort, sortMappings);
+    }
+    private void AddHateoasLinks(
+    DataCollectionResponse<DeveloperDto> response,
+    DeveloperQueryParameters queries,
+    IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+    IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder,
+    IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
+    {
+        if (!representationContext.IncludeHateoasLinks)
+        {
+            return;
+        }
+
+        foreach (var developer in response.Data)
+        {
+            AddDeveloperLinks(developer, queries, gameLinkBuilder, tagLinkBuilder, genreLinkBuilder);
+        }
+
+        if (response.Pagination?.PaginationType == PaginationType.Cursor)
+        {
+            response.Links =
+                developerLinkBuilder.CreateCursorCollectionLinks(HttpContext, queries, response.Pagination.NextCursor, response.Pagination.PreviousCursor);
+
+            return;
+        }
+
+        response.Links =
+            developerLinkBuilder.CreateLinksForCollection(HttpContext, queries, response.Pagination?.HasNextPage ?? false, response.Pagination?.HasPreviousPage ?? false);
+    }
+    private void AddDeveloperLinks(
+    DeveloperDto developer,
+    DeveloperQueryParameters queries,
+    IHateoasLinkBuilder<GameDto, GameQueryParameters> gameLinkBuilder,
+    IHateoasLinkBuilder<TagDto, TagQueryParameters> tagLinkBuilder,
+    IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder)
+    {
+        foreach (var game in developer.Games)
+        {
+            game.Links = gameLinkBuilder.CreateLinksForResource(HttpContext, game.Id, queries.Fields);
+
+            foreach (var tag in game.Tags)
+            {
+                tag.Links = tagLinkBuilder.CreateLinksForResource(HttpContext, tag.Id, queries.Fields);
+            }
+
+            foreach (var genre in game.Genres)
+            {
+                genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
+            }
+        }
+
+        developer.Links = developerLinkBuilder.CreateLinksForResource(HttpContext, developer.Id, queries.Fields);
+    }
+
 }

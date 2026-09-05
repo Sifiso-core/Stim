@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Comment : IVersionedEntity
+public class Comment : IVersionedEntity, ICursorPaginatedEntity
 {
     public string Id { get; set; } = string.Empty;
     public required string CommentText { get; set; }

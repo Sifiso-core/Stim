@@ -122,6 +122,9 @@ namespace Stim.Api.Migrations.Application
                     b.Property<string>("Id")
                         .HasColumnType("text");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -149,6 +152,9 @@ namespace Stim.Api.Migrations.Application
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
@@ -187,6 +193,24 @@ namespace Stim.Api.Migrations.Application
                     b.HasIndex("DeveloperId");
 
                     b.ToTable("Games", "stim");
+                });
+
+            modelBuilder.Entity("Stim.Api.Entities.GameGenre", b =>
+                {
+                    b.Property<string>("GameId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GenreId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("GameId", "GenreId");
+
+                    b.HasIndex("GenreId");
+
+                    b.ToTable("GameGenres", "stim");
                 });
 
             modelBuilder.Entity("Stim.Api.Entities.GameTag", b =>
@@ -296,6 +320,9 @@ namespace Stim.Api.Migrations.Application
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<string>("GameId")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("LastUpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -311,6 +338,8 @@ namespace Stim.Api.Migrations.Application
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GameId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -384,19 +413,42 @@ namespace Stim.Api.Migrations.Application
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Stim.Api.Entities.GameGenre", b =>
+                {
+                    b.HasOne("Stim.Api.Entities.Game", "Game")
+                        .WithMany("GameGenres")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Stim.Api.Entities.Genre", "Genre")
+                        .WithMany()
+                        .HasForeignKey("GenreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Genre");
+                });
+
             modelBuilder.Entity("Stim.Api.Entities.GameTag", b =>
                 {
-                    b.HasOne("Stim.Api.Entities.Game", null)
+                    b.HasOne("Stim.Api.Entities.Game", "Game")
                         .WithMany("GameTags")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Stim.Api.Entities.Tag", null)
+                    b.HasOne("Stim.Api.Entities.Tag", "Tag")
                         .WithMany()
                         .HasForeignKey("TagId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Tag");
                 });
 
             modelBuilder.Entity("Stim.Api.Entities.Genre", b =>
@@ -417,6 +469,13 @@ namespace Stim.Api.Migrations.Application
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Stim.Api.Entities.Tag", b =>
+                {
+                    b.HasOne("Stim.Api.Entities.Game", null)
+                        .WithMany("Tags")
+                        .HasForeignKey("GameId");
+                });
+
             modelBuilder.Entity("Stim.Api.Entities.Developer", b =>
                 {
                     b.Navigation("Games");
@@ -424,9 +483,13 @@ namespace Stim.Api.Migrations.Application
 
             modelBuilder.Entity("Stim.Api.Entities.Game", b =>
                 {
+                    b.Navigation("GameGenres");
+
                     b.Navigation("GameTags");
 
                     b.Navigation("Genres");
+
+                    b.Navigation("Tags");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Tag : IVersionedEntity
+public class Tag : IVersionedEntity, ICursorPaginatedEntity
 {
     public required string Id { get; set; }
     public required string Name { get; set; }

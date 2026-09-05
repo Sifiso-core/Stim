@@ -22,9 +22,15 @@ public static class DeveloperMappings
             Id = $"d_{Guid.CreateVersion7()}",
             Name = dto.Name,
             Description = dto.Description,
-            WebsiteUrl = dto.WebsiteUrl
+            WebsiteUrl = dto.WebsiteUrl,
+            CreatedAtUtc = DateTime.UtcNow
         };
     }
+    public static List<DeveloperDto> ToDto(this IEnumerable<Entities.Developer> developers)
+    {
+        return [.. developers.Select(d => d.ToDto())];
+    }
+
     public static DeveloperDto ToDto(this Entities.Developer developer)
     {
         return new DeveloperDto()
@@ -68,4 +74,5 @@ public static class DeveloperMappings
         developer.Name = updateDeveloper.Name;
         developer.WebsiteUrl = updateDeveloper.WebsiteUrl;
     }
+
 }

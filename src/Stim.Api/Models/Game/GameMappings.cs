@@ -15,6 +15,10 @@ public static class GameMappings
             new(nameof(GameDto.LastUpdatedAtUtc),nameof(Entities.Game.LastUpdatedAtUtc)),
         ]
     };
+    public static List<GameDto> ToDto(this IEnumerable<Entities.Game> games)
+    {
+        return [.. games.Select(g => g.ToDto())];
+    }
     public static GameDto ToDto(this Entities.Game game)
     {
         return new GameDto()
@@ -27,14 +31,14 @@ public static class GameMappings
             Price = game.Price,
             ReleaseDateUtc = game.ReleaseDateUtc,
             LastUpdatedAtUtc = game.LastUpdatedAtUtc,
-            Genres = [.. game.Genres.Select(g => new GenreDto(){
-                Id = g.Id,
-                Name = g.Name,
-                Slug = g.Slug
+            Genres = [.. game.GameGenres.Select(gg => new GenreDto
+            {
+                Id = gg.Genre.Id, Name = gg.Genre.Name, Slug = gg.Genre.Slug
             })],
-            Tags = [.. game.Tags.Select(t => new TagDto(){
-                Id = t.Id,
-                Name = t.Name
+            Tags = [.. game.GameTags.Select(t => new TagDto(){
+                Id = t.Tag.Id,
+                Name = t.Tag.Name,
+                Description = t.Tag.Description
             })],
         };
     }

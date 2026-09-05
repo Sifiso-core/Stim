@@ -15,14 +15,13 @@ using Stim.Api.Services.Data_Shaping;
 using Stim.Api.Services.Hateoas;
 using Stim.Api.Services.Representation_Context;
 using Stim.Api.Services.Sorting;
-using Stim.Api.Services.User_Context;
 
 namespace Stim.Api.Controllers;
 
 [Route("genres")]
 [ApiController]
 [ApiVersion(1.0)]
-public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> hateoasLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
+public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<GenreDto, GenreQueryParameters> genreLinkBuilder, IConcurrencyService concurrencyService, IRepresentationContext representationContext) : ControllerBase
 {
 
     [Authorize(Roles = $"{Roles.Member},{Roles.Admin}")]
@@ -30,52 +29,72 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataCollectionResponse<GenreDto>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<DataCollectionResponse<GenreDto>>> GetGenres([FromQuery] GenreQueryParameters queries, SortMappingProvider sortMappingProvider, DataShapingService dataShapingService)
+    public async Task<ActionResult<DataCollectionResponse<GenreDto>>> GetGenres(
+    [FromQuery] GenreQueryParameters queries,
+    SortMappingProvider sortMappingProvider,
+    DataShapingService dataShapingService,
+    CancellationToken cancellationToken)
     {
-        if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
+        var validationResult = ValidateQueryParameters(queries, sortMappingProvider, dataShapingService);
+
+        if (validationResult is not null)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided sort parameters is invalid '{queries.Sort}'");
-        }
-        if (!dataShapingService.Validate<GenreDto>(queries.Fields))
-        {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"The provided data shaping field isn't valid: {queries.Fields}");
-        }
-        var sortMappings = sortMappingProvider.GetMappings<GenreDto, Genre>();
-
-        var search = queries.Search?.Trim().ToLower();
-
-        var slug = queries.Slug?.Trim().ToLower();
-
-        var genresQueryable = context.Genres
-            .Where(g => search == null || g.Name.ToLower().Contains(search))
-            .Where(g => slug == null || g.Slug.ToLower().Equals(slug))
-            .ApplySort(queries.Sort, sortMappings)
-            .Select(GenreQueries.ProjectToDto());
-
-        var paginationResult = await genresQueryable.ToPaginationResultAsync(queries.Page, queries.PageSize);
-
-        var links = new List<LinkDto>();
-
-        if (representationContext.IncludeHateoasLinks)
-        {
-            links.AddRange(hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
-
-            paginationResult.Links = links;
-
+            return validationResult;
         }
 
-        var result = new DataCollectionResponse<ExpandoObject>()
-        {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? g => hateoasLinkBuilder.CreateLinksForResource(HttpContext, g.Id, queries.Fields) : null),
+        var genresQuery = BuildGenreQuery(queries, sortMappingProvider);
 
-            Links = representationContext.IncludeHateoasLinks ? links : null
+        var pageSize = queries.PageSize ?? GenreQueryParameters.GenreQueryDefaults.PageSize;
+
+        DataCollectionResponse<GenreDto> dataCollectionResponse;
+
+        if (queries.PaginationType == PaginationType.Cursor)
+        {
+            var result = await genresQuery.ToCursorPaginationResult(queries.Cursor, pageSize, cancellationToken);
+
+            dataCollectionResponse = new()
+            {
+                Data = result.Data.ToDto(),
+                Links = result.Links,
+                Pagination = result.Pagination
+            };
+        }
+        else
+        {
+            var page = queries.Page ?? GenreQueryParameters.GenreQueryDefaults.Page;
+
+            var result = await genresQuery.ToPaginationResultAsync(page, pageSize, cancellationToken);
+
+            queries = queries with
+            {
+                Page = page
+            };
+
+            dataCollectionResponse = new()
+            {
+                Data = result.Data.ToDto(),
+                Links = result.Links,
+                Pagination = result.Pagination
+            };
+        }
+
+        AddHateoasLinks(dataCollectionResponse, queries);
+
+        var shapedData = dataShapingService.ShapeCollectionData(dataCollectionResponse.Data, queries.Fields);
+
+        var response = new DataCollectionResponse<ExpandoObject>
+        {
+            Data = [.. shapedData],
+            Pagination = dataCollectionResponse.Pagination,
+            Links = dataCollectionResponse.Links
         };
 
-        return Ok(result);
+        return Ok(response);
     }
+
     [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet("{identifier}", Name = "GetGenreBySlugOrId")]
-    [ETagCache]
+    [ETagConcurrencyFilterAttribute]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenreDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
@@ -100,7 +119,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         if (representationContext.IncludeHateoasLinks)
         {
-            genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
+            genreDto.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, fields);
         }
 
         return Ok(genreDto);
@@ -128,33 +147,16 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         var normalisedString = slug.ToLower();
 
-        var paginationResult = await context.Games.Where(game => game.Genres.Any(g => g.Slug == normalisedString))
+        var dataCollectionResponse = await context.Games.Where(game => game.Genres.Any(g => g.Slug == normalisedString))
                                                       .Select(GameQueries.ProjectToGameDto())
-                                                      .ApplySort(queries.Sort, sortMappings).ToPaginationResultAsync(queries.Page, queries.PageSize);
-
-        var links = new List<LinkDto>();
+                                                      .ApplySort(queries.Sort, sortMappings).ToPaginationResultAsync(queries.Page ?? GenreQueryParameters.GenreQueryDefaults.Page, queries.PageSize ?? GenreQueryParameters.GenreQueryDefaults.PageSize);
 
         if (representationContext.IncludeHateoasLinks)
         {
-            links.AddRange(gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage));
+            dataCollectionResponse.Links = gameLinkBuilder.CreateLinksForCollection(HttpContext, queries, dataCollectionResponse.Pagination.HasNextPage, dataCollectionResponse.Pagination.HasPreviousPage);
         }
 
-        var result = new DataCollectionResponse<ExpandoObject>
-        {
-            Data = dataShapingService.ShapeCollectionData(paginationResult.Data, queries.Fields, representationContext.IncludeHateoasLinks ? d =>
-            {
-                foreach (var genre in d.Genres)
-                {
-                    genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
-                }
-                return gameLinkBuilder.CreateLinksForResource(HttpContext, d.Id, queries.Fields);
-            }
-            : null),
-
-            Links = representationContext.IncludeHateoasLinks ? links : null
-        };
-
-        return Ok(result);
+        return Ok(dataCollectionResponse);
     }
     [Authorize(Roles = Roles.Admin)]
     [HttpPost(Name = "CreateGenre")]
@@ -175,7 +177,7 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         if (representationContext.IncludeHateoasLinks)
         {
-            genreDto.Links = hateoasLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
+            genreDto.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genreDto.Id, null);
         }
 
         return CreatedAtRoute("GetGenreBySlugOrId", new { identifier = genre.Slug }, genreDto);
@@ -230,4 +232,86 @@ public class GenresController(ApplicationDbContext context, IHateoasLinkBuilder<
 
         return NoContent();
     }
+    private IQueryable<Genre> BuildGenreQuery(GenreQueryParameters queries, SortMappingProvider sortMappingProvider)
+    {
+        var search = queries.Search?.Trim().ToLower();
+
+        var slug = queries.Slug?.Trim().ToLower();
+
+        var sortMappings = sortMappingProvider.GetMappings<GenreDto, Genre>();
+
+        return context.Genres.Where(genre => search == null || genre.Name.ToLower().Contains(search))
+                            .Where(genre => slug == null || genre.Slug.ToLower() == slug)
+                            .ApplySort(queries.Sort, sortMappings);
+    }
+    private ObjectResult? ValidateQueryParameters(
+        GenreQueryParameters queries,
+        SortMappingProvider sortMappingProvider,
+        DataShapingService dataShapingService)
+    {
+        if (queries.Page is not null && queries.Cursor is not null)
+        {
+            return Problem("The 'page' and 'cursor' query parameters cannot be used together.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.Page is not null && queries.Page < 1)
+        {
+            return Problem("The 'page' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PageSize is not null && queries.PageSize < 1)
+        {
+            return Problem("The 'pageSize' query parameter must be greater than zero.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!sortMappingProvider.ValidateMappings<GenreDto, Genre>(queries.Sort))
+        {
+            return Problem($"The supplied sort parameter is invalid: '{queries.Sort}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!dataShapingService.Validate<GenreDto>(queries.Fields))
+        {
+            return Problem($"The supplied fields parameter is invalid: '{queries.Fields}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        if (queries.PaginationType == PaginationType.Cursor && !string.IsNullOrWhiteSpace(queries.Sort))
+        {
+            return Problem("Custom sorting is not supported with cursor pagination. " + "Cursor pagination uses CreatedAtUtc descending and Id ascending.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        if (queries.PaginationType == PaginationType.Cursor && queries.Page is not null)
+        {
+            return Problem("'page' cannot be used with cursor pagination.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (queries.PaginationType == PaginationType.Offset && !string.IsNullOrWhiteSpace(queries.Cursor))
+        {
+            return Problem("'Cursor' cannot be used with offset pagination. Review your parameters", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+
+        return null;
+    }
+    private void AddHateoasLinks(
+        DataCollectionResponse<GenreDto> response,
+        GenreQueryParameters queries)
+    {
+        if (!representationContext.IncludeHateoasLinks)
+        {
+            return;
+        }
+
+        foreach (var genre in response.Data)
+        {
+            genre.Links = genreLinkBuilder.CreateLinksForResource(HttpContext, genre.Id, queries.Fields);
+        }
+
+        if (response.Pagination?.PaginationType == PaginationType.Cursor)
+        {
+            response.Links = genreLinkBuilder.CreateCursorCollectionLinks(HttpContext, queries, response.Pagination.NextCursor, response.Pagination.PreviousCursor);
+
+            return;
+        }
+
+        response.Links = genreLinkBuilder.CreateLinksForCollection(HttpContext, queries, response.Pagination?.HasNextPage ?? false, response.Pagination?.HasPreviousPage ?? false);
+    }
+
 }

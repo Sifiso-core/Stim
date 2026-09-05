@@ -26,10 +26,16 @@ public class GameEntityConfiguration : IEntityTypeConfiguration<Game>
             .HasForeignKey(g => g.DeveloperId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasMany(g => g.Tags).WithMany().UsingEntity<GameTag>();
-
         builder.Property(g => g.RowVersion)
             .HasColumnName("xmin")
             .IsRowVersion();
+
+        builder.HasMany(g => g.GameGenres)
+            .WithOne(gg => gg.Game)
+            .HasForeignKey(gg => gg.GameId);
+
+        builder.HasMany(g => g.GameTags)
+            .WithOne(gg => gg.Game)
+            .HasForeignKey(gg => gg.GameId);
     }
 }

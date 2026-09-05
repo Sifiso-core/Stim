@@ -1,6 +1,6 @@
 namespace Stim.Api.Entities;
 
-public class Genre : IVersionedEntity
+public class Genre : IVersionedEntity, ICursorPaginatedEntity
 {
     public required string Id { get; set; }
     public string Name { get; set; } = string.Empty;

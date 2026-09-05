@@ -44,7 +44,7 @@ public class CommentsController(ApplicationDbContext dbContext, UserContext user
             .Where(c => c.GameId == gameId)
             .OrderByDescending(c => c.CreatedAtUtc)
             .Select(CommentQueries.ProjectToDto())
-            .ToPaginationResultAsync(queries.Page, queries.PageSize);
+            .ToPaginationResultAsync(queries.Page, queries.PageSize, cancellationToken);
 
         if (representationContext.IncludeHateoasLinks)
         {
@@ -58,14 +58,14 @@ public class CommentsController(ApplicationDbContext dbContext, UserContext user
         {
             Data = paginationResult.Data,
 
-            Links = representationContext.IncludeHateoasLinks ? hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.HasNextPage, paginationResult.HasPreviousPage) : null
+            Links = representationContext.IncludeHateoasLinks ? hateoasLinkBuilder.CreateLinksForCollection(HttpContext, queries, paginationResult.Pagination.HasNextPage, paginationResult.Pagination.HasPreviousPage) : null
         };
 
         return Ok(result);
     }
     [Authorize(Roles = $"{Roles.Admin},{Roles.Member}")]
     [HttpGet("{commentId}", Name = "GetCommentById")]
-    [ETagCache]
+    [ETagConcurrencyFilterAttribute]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentDto>> GetCommentById(

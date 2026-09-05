@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Stim.Api.Migrations.Application
 {
     /// <inheritdoc />
-    public partial class Initialise_Application : Migration
+    public partial class init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -22,7 +22,9 @@ namespace Stim.Api.Migrations.Application
                     Id = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    WebsiteUrl = table.Column<string>(type: "text", nullable: true)
+                    WebsiteUrl = table.Column<string>(type: "text", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -56,22 +58,6 @@ namespace Stim.Api.Migrations.Application
                 });
 
             migrationBuilder.CreateTable(
-                name: "Tags",
-                schema: "stim",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Tags", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Users",
                 schema: "stim",
                 columns: table => new
@@ -101,7 +87,9 @@ namespace Stim.Api.Migrations.Application
                     ReleaseDateUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ImageUrl = table.Column<string>(type: "text", nullable: true),
-                    DeveloperId = table.Column<string>(type: "text", nullable: false)
+                    DeveloperId = table.Column<string>(type: "text", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -148,7 +136,8 @@ namespace Stim.Api.Migrations.Application
                     CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     GameId = table.Column<string>(type: "text", nullable: false),
-                    UserId = table.Column<string>(type: "character varying(500)", nullable: false)
+                    UserId = table.Column<string>(type: "character varying(500)", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -165,6 +154,84 @@ namespace Stim.Api.Migrations.Application
                         column: x => x.UserId,
                         principalSchema: "stim",
                         principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Genres",
+                schema: "stim",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    ImageUrl = table.Column<string>(type: "text", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Slug = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    GameId = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Genres", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Genres_Games_GameId",
+                        column: x => x.GameId,
+                        principalSchema: "stim",
+                        principalTable: "Games",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Tags",
+                schema: "stim",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    GameId = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Tags", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Tags_Games_GameId",
+                        column: x => x.GameId,
+                        principalSchema: "stim",
+                        principalTable: "Games",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "GameGenres",
+                schema: "stim",
+                columns: table => new
+                {
+                    GameId = table.Column<string>(type: "text", nullable: false),
+                    GenreId = table.Column<string>(type: "text", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GameGenres", x => new { x.GameId, x.GenreId });
+                    table.ForeignKey(
+                        name: "FK_GameGenres_Games_GameId",
+                        column: x => x.GameId,
+                        principalSchema: "stim",
+                        principalTable: "Games",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_GameGenres_Genres_GenreId",
+                        column: x => x.GenreId,
+                        principalSchema: "stim",
+                        principalTable: "Genres",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -197,31 +264,6 @@ namespace Stim.Api.Migrations.Application
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "Genres",
-                schema: "stim",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    ImageUrl = table.Column<string>(type: "text", nullable: true),
-                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    LastUpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    Slug = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    GameId = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Genres", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Genres_Games_GameId",
-                        column: x => x.GameId,
-                        principalSchema: "stim",
-                        principalTable: "Games",
-                        principalColumn: "Id");
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_GameId",
                 schema: "stim",
@@ -239,6 +281,12 @@ namespace Stim.Api.Migrations.Application
                 schema: "stim",
                 table: "Comments",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GameGenres_GenreId",
+                schema: "stim",
+                table: "GameGenres",
+                column: "GenreId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Games_DeveloperId",
@@ -279,6 +327,12 @@ namespace Stim.Api.Migrations.Application
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Tags_GameId",
+                schema: "stim",
+                table: "Tags",
+                column: "GameId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Tags_Name",
                 schema: "stim",
                 table: "Tags",
@@ -308,11 +362,11 @@ namespace Stim.Api.Migrations.Application
                 schema: "stim");
 
             migrationBuilder.DropTable(
-                name: "GameTags",
+                name: "GameGenres",
                 schema: "stim");
 
             migrationBuilder.DropTable(
-                name: "Genres",
+                name: "GameTags",
                 schema: "stim");
 
             migrationBuilder.DropTable(
@@ -324,15 +378,19 @@ namespace Stim.Api.Migrations.Application
                 schema: "stim");
 
             migrationBuilder.DropTable(
+                name: "Genres",
+                schema: "stim");
+
+            migrationBuilder.DropTable(
                 name: "Tags",
                 schema: "stim");
 
             migrationBuilder.DropTable(
-                name: "Games",
+                name: "IdentityUser",
                 schema: "stim");
 
             migrationBuilder.DropTable(
-                name: "IdentityUser",
+                name: "Games",
                 schema: "stim");
 
             migrationBuilder.DropTable(

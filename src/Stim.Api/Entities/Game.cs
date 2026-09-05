@@ -3,7 +3,7 @@ using System;
 namespace Stim.Api.Entities;
 
 
-public class Game : IVersionedEntity
+public class Game : IVersionedEntity, ICursorPaginatedEntity
 {
     public required string Id { get; set; }
     public required string Title { get; set; }
@@ -15,7 +15,9 @@ public class Game : IVersionedEntity
     public string DeveloperId { get; set; } = string.Empty;
     public List<Genre> Genres { get; set; } = [];
     public List<GameTag> GameTags { get; set; } = [];
+    public List<GameGenre> GameGenres { get; set; } = [];
     public List<Tag> Tags { get; set; } = [];
     public uint RowVersion { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
 }

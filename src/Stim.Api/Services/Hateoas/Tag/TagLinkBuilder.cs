@@ -6,6 +6,23 @@ namespace Stim.Api.Services.Hateoas.Tag;
 
 public class TagLinkBuilder(LinkGenerator linkGenerator) : IHateoasLinkBuilder<TagDto, TagQueryParameters>
 {
+    public List<LinkDto> CreateCursorCollectionLinks(HttpContext httpContext, TagQueryParameters queryParameters, string? nextCursor, string? previousCursor)
+    {
+        var links = new List<LinkDto>
+        {
+            CreateLink(httpContext, nameof(TagsController.GetTags), IanaLinkRelations.Self, HttpMethods.Get, queryParameters)
+        };
+        if (nextCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(TagsController.GetTags), IanaLinkRelations.Next, HttpMethods.Get, queryParameters with { Page = null, Cursor = nextCursor }));
+        }
+        if (previousCursor is not null)
+        {
+            links.Add(CreateLink(httpContext, nameof(TagsController.GetTags), IanaLinkRelations.Prev, HttpMethods.Get, queryParameters with { Page = null, Cursor = previousCursor }));
+        }
+        return links;
+    }
+
     public List<LinkDto> CreateLinksForCollection(HttpContext httpContext, TagQueryParameters queryParameters, bool hasNext, bool hasPrevious)
     {
         var links = new List<LinkDto>()

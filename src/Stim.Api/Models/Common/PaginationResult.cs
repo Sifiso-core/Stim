@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace Stim.Api.Models.Common;
 
-public class PaginationResult<T>
+public class OffsetPaginationResult<T>
 {
     public List<T> Data { get; set; } = [];
     public int Page { get; set; }
