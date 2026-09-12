@@ -18,14 +18,12 @@ Stim is a game/developer catalogue API where clients can retrieve, create, updat
 * **Role-Based Access Control (RBAC)**
 * **ETag caching and optimistic concurrency control**
 * **PostgreSQL `xmin` row-versioning**
-* **Rate limiting**
 * **Idempotency**
 * **FluentValidation**
 * **Global exception handling**
 * **ASP.NET Core Identity**
 * **OpenAPI documentation**
 * **Scalar API reference**
-* **Unit and integration testing**
 
 ## Technology Stack
 
